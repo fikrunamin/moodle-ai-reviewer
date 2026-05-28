@@ -6,6 +6,11 @@ import { registerAssessmentRoutes } from "./assessment.routes";
 import { registerAiSettingRoutes } from "./ai-setting.routes";
 
 export function registerRoutes(app: Hono) {
+  app.onError((err, c) => {
+    console.error(err);
+    return c.json({ error: err instanceof Error ? err.message : "Unexpected error" }, 500);
+  });
+
   registerMoodleRoutes(app);
   registerActivityRoutes(app);
   registerStudentRoutes(app);

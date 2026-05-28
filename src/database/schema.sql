@@ -14,7 +14,10 @@ CREATE TABLE IF NOT EXISTS moodle_activities (
   type TEXT NOT NULL CHECK (type IN ('assignment', 'discussion')),
   title TEXT NOT NULL,
   url TEXT NOT NULL,
+  instruction TEXT,
+  prompt TEXT,
   sync_status TEXT NOT NULL DEFAULT 'idle',
+  sync_error TEXT,
   last_synced_at TEXT,
   total_students INTEGER NOT NULL DEFAULT 0,
   reviewed_students INTEGER NOT NULL DEFAULT 0,
@@ -30,6 +33,7 @@ CREATE TABLE IF NOT EXISTS moodle_students (
   submission_status TEXT,
   ai_status TEXT NOT NULL DEFAULT 'pending',
   recommended_score REAL,
+  interaction_count INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (activity_id) REFERENCES moodle_activities(id)

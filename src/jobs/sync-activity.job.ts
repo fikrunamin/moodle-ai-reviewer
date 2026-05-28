@@ -1,3 +1,5 @@
+import { MoodleSyncService } from "../moodle/moodle-sync.service";
+
 export async function syncActivityJob(activityId: string) {
-  return { activityId, status: "queued" };
+  return new MoodleSyncService().syncActivity(activityId);
 }

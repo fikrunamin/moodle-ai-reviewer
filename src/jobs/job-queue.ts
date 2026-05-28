@@ -3,10 +3,16 @@ type Job = () => Promise<void>;
 export class JobQueue {
   private queue: Job[] = [];
   private running = false;
+  private pending = 0;
 
   enqueue(job: Job) {
     this.queue.push(job);
+    this.pending += 1;
     void this.run();
+  }
+
+  getStatus() {
+    return { running: this.running, queued: this.queue.length, pending: this.pending };
   }
 
   private async run() {
@@ -15,7 +21,13 @@ export class JobQueue {
 
     while (this.queue.length > 0) {
       const job = this.queue.shift();
-      if (job) await job();
+      if (job) {
+        try {
+          await job();
+        } finally {
+          this.pending -= 1;
+        }
+      }
     }
 
     this.running = false;

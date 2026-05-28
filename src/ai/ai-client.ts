@@ -26,6 +26,20 @@ export class AiClient {
     }
 
     const data = await response.json();
-    return JSON.parse(data.choices[0].message.content);
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error("AI provider returned empty content");
+    return typeof content === "string" ? JSON.parse(content) : content;
+  }
+
+  async testConnection() {
+    const response = await fetch(`${this.options.baseUrl}/models`, {
+      headers: { Authorization: `Bearer ${this.options.apiKey}` },
+    });
+
+    if (!response.ok) {
+      throw new Error(`AI connection failed: ${response.status}`);
+    }
+
+    return { ok: true };
   }
 }

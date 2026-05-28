@@ -10,5 +10,6 @@ export const paths = {
   extracted: join(root, "data", "extracted"),
   sessions: join(root, "data", "sessions"),
   logs: join(root, "data", "logs"),
-  webDist: join(root, "src", "web", "dist"),
+  webDist: join(root, "web-dist"),
+  sourceWebDist: join(root, "src", "web", "dist"),
 };

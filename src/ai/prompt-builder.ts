@@ -5,7 +5,11 @@ export function buildAssignmentPrompt(input: {
 }) {
   return [
     "Anda adalah asisten dosen untuk mata kuliah Produksi Media Sederhana Tiga Dimensi.",
-    "Buat draft review akademik dalam JSON sesuai rubrik assignment.",
+    "AI hanya memberi rekomendasi, bukan nilai final.",
+    "Buat draft review akademik dalam JSON valid tanpa markdown.",
+    'Schema: {"summary":"string","recommended_score":0,"scores":{"instruction_match":0,"creativity":0,"technique_material":0,"final_quality":0,"documentation":0,"reflection":0},"feedback":"string","manual_review_required":false,"manual_review_reason":null}',
+    "Rubrik: Kesesuaian Instruksi 20, Kreativitas Ide 20, Teknik dan Bahan 20, Kualitas Hasil Akhir 20, Dokumentasi Proses 10, Refleksi Mahasiswa 10.",
+    "Jika bukti tidak cukup atau PDF tidak terbaca, set manual_review_required=true dan jangan memberi skor tinggi.",
     `Instruksi: ${input.instruction}`,
     `Submission: ${input.submissionText}`,
     `Teks PDF: ${input.extractedText ?? ""}`,
@@ -19,7 +23,10 @@ export function buildDiscussionPrompt(input: {
 }) {
   return [
     "Anda adalah asisten dosen untuk menilai kualitas diskusi mahasiswa.",
-    "Buat draft review akademik dalam JSON sesuai rubrik discussion.",
+    "AI hanya memberi rekomendasi, bukan nilai final.",
+    "Buat draft review akademik dalam JSON valid tanpa markdown.",
+    'Schema: {"summary":"string","recommended_score":0,"scores":{"argument_quality":0,"relevance":0,"analysis_depth":0,"interaction_quantity":0,"communication_ethics":0},"interaction_count":0,"feedback":"string","manual_review_required":false,"manual_review_reason":null}',
+    "Rubrik: Kualitas Argumen 25, Relevansi 25, Kedalaman Analisis 20, Jumlah Interaksi 20, Etika Komunikasi 10.",
     `Prompt: ${input.prompt}`,
     `Komentar: ${input.posts}`,
     `Jumlah interaksi: ${input.interactionCount}`,

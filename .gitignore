@@ -24,6 +24,7 @@ data/downloads/*
 data/extracted/*
 data/sessions/*
 data/logs/*
+data/sessions/moodle-cookies.json
 
 # Keep runtime folders
 !data/downloads/.gitkeep
