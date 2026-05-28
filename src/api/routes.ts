@@ -5,6 +5,7 @@ import { registerStudentRoutes } from "./student.routes";
 import { registerAssessmentRoutes } from "./assessment.routes";
 import { registerAiSettingRoutes } from "./ai-setting.routes";
 import { registerFileRoutes } from "./file.routes";
+import { registerUpdateRoutes } from "./update.routes";
 import { logger } from "../shared/logger";
 
 export function registerRoutes(app: Hono) {
@@ -19,4 +20,5 @@ export function registerRoutes(app: Hono) {
   registerAssessmentRoutes(app);
   registerAiSettingRoutes(app);
   registerFileRoutes(app);
+  registerUpdateRoutes(app);
 }

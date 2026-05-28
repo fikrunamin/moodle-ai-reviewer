@@ -6,7 +6,7 @@ interface Props {
 }
 
 export function AISettingsModal({ onClose }: Props) {
-  const [activeTab, setActiveTab] = useState<"ai" | "moodle">("ai");
+  const [activeTab, setActiveTab] = useState<"ai" | "moodle" | "update">("ai");
   const [providerName, setProviderName] = useState("OpenAI");
   const [baseUrl, setBaseUrl] = useState("https://api.openai.com/v1");
   const [apiKey, setApiKey] = useState("");
@@ -16,6 +16,17 @@ export function AISettingsModal({ onClose }: Props) {
   const [cookies, setCookies] = useState("");
   const [sessionStatus, setSessionStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<string | null>(null);
+  const [updateInfo, setUpdateInfo] = useState<{
+    repository: string;
+    currentVersion: string;
+    latestVersion: string;
+    updateAvailable: boolean;
+    releaseName: string;
+    releaseUrl: string;
+    publishedAt: string | null;
+    recommendedAsset: { name: string; url: string; size: number } | null;
+  } | null>(null);
 
   useEffect(() => {
     apiGet<{
@@ -89,6 +100,47 @@ export function AISettingsModal({ onClose }: Props) {
     }
   }
 
+  async function checkUpdate() {
+    setBusy(true);
+    setUpdateStatus("Checking update...");
+    try {
+      const result = await apiGet<typeof updateInfo>("/api/update/check");
+      setUpdateInfo(result);
+      setUpdateStatus(result?.updateAvailable ? "Update available" : "Already on latest version");
+    } catch (error) {
+      setUpdateStatus(error instanceof Error ? error.message : "Update check failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openLatestRelease() {
+    setBusy(true);
+    setUpdateStatus("Opening release page...");
+    try {
+      const result = await apiPost<typeof updateInfo>("/api/update/open-latest");
+      setUpdateInfo(result);
+      setUpdateStatus("Release page opened");
+    } catch (error) {
+      setUpdateStatus(error instanceof Error ? error.message : "Failed to open release page");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function applyUpdate() {
+    setBusy(true);
+    setUpdateStatus("Downloading update...");
+    try {
+      const result = await apiPost<typeof updateInfo & { message?: string }>("/api/update/apply");
+      setUpdateInfo(result);
+      setUpdateStatus(result?.message ?? "Update downloaded. App will restart.");
+    } catch (error) {
+      setUpdateStatus(error instanceof Error ? error.message : "Failed to apply update");
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
       <div className="win-modal w-full max-w-3xl">
@@ -112,6 +164,12 @@ export function AISettingsModal({ onClose }: Props) {
               onClick={() => setActiveTab("moodle")}
             >
               🍪 Moodle Cookies
+            </button>
+            <button
+              className={`win-tab mt-1 w-full ${activeTab === "update" ? "active" : ""}`}
+              onClick={() => setActiveTab("update")}
+            >
+              ⬆️ Update
             </button>
           </aside>
 
@@ -149,7 +207,7 @@ export function AISettingsModal({ onClose }: Props) {
                   <button className="win-button" onClick={save}>💾 Save</button>
                 </div>
               </>
-            ) : (
+            ) : activeTab === "moodle" ? (
               <>
                 <div className="grid gap-2 p-2">
                   <div>
@@ -182,6 +240,52 @@ export function AISettingsModal({ onClose }: Props) {
                   </button>
                   <button className="win-button" disabled={busy || !moodleBaseUrl || !cookies} onClick={saveCookies}>
                     💾 Save Cookies
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="grid gap-2 p-2">
+                  <div>
+                    <h3 className="font-medium">Application Update</h3>
+                    <p>Cek release terbaru dari GitHub dan download paket terbaru secara manual.</p>
+                  </div>
+                  {updateInfo ? (
+                    <div className="win-inset grid gap-1 p-2">
+                      <p>Repo: {updateInfo.repository}</p>
+                      <p>Current: v{updateInfo.currentVersion}</p>
+                      <p>Latest: v{updateInfo.latestVersion}</p>
+                      <p>Status: {updateInfo.updateAvailable ? "Update tersedia" : "Sudah versi terbaru"}</p>
+                      {updateInfo.recommendedAsset ? (
+                        <p>Asset: {updateInfo.recommendedAsset.name}</p>
+                      ) : (
+                        <p>Asset: belum ada downloadable asset.</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="win-inset p-2">Belum dicek.</div>
+                  )}
+                  {updateStatus ? <p className="win-status">{updateStatus}</p> : null}
+                </div>
+                <div className="mt-auto flex justify-end gap-1 p-2">
+                  {updateInfo?.recommendedAsset ? (
+                    <a className="win-button" href={updateInfo.recommendedAsset.url} target="_blank" rel="noreferrer">
+                      📦 Download Asset
+                    </a>
+                  ) : null}
+                  {updateInfo ? (
+                    <a className="win-button" href={updateInfo.releaseUrl} target="_blank" rel="noreferrer">
+                      🌐 Release Page
+                    </a>
+                  ) : null}
+                  <button className="win-button" disabled={busy} onClick={openLatestRelease}>
+                    🚀 Open Latest
+                  </button>
+                  <button className="win-button" disabled={busy || !updateInfo?.updateAvailable || !updateInfo?.recommendedAsset} onClick={applyUpdate}>
+                    ⚙️ Self Update
+                  </button>
+                  <button className="win-button" disabled={busy} onClick={checkUpdate}>
+                    🔎 Check Update
                   </button>
                 </div>
               </>

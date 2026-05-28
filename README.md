@@ -45,8 +45,20 @@ bun run build:macos
 
 ## GitHub Release
 
-Push tag `v0.1.0` atau jalankan workflow `Build and Release` secara manual.
+Push tag versi seperti `v0.3.0` atau jalankan workflow `Build and Release` secara manual.
 Workflow akan membuat downloadable `.zip` dan `.tar.gz` untuk Windows x64, macOS arm64, dan macOS x64.
+
+## Check Update
+
+Aplikasi bisa cek release terbaru dari GitHub lewat `Settings -> Update`.
+Default repo:
+
+```env
+UPDATE_GITHUB_REPO=fikrunamin/moodle-ai-reviewer
+```
+
+Update portable dilakukan manual: download asset terbaru, extract folder baru, lalu jalankan executable baru.
+Untuk Windows/macOS, tombol `Self Update` akan download asset `.zip`, menutup app, menyalin file versi baru, lalu membuka app lagi. Folder `data/` tidak ditimpa.
 
 ## Runtime
 

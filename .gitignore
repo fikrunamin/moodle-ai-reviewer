@@ -23,6 +23,7 @@ data/app.sqlite-*
 data/downloads/*
 data/extracted/*
 data/rubrics/*
+data/updates/*
 data/sessions/*
 data/logs/*
 data/sessions/moodle-cookies.json
@@ -31,6 +32,7 @@ data/sessions/moodle-cookies.json
 !data/downloads/.gitkeep
 !data/extracted/.gitkeep
 !data/rubrics/.gitkeep
+!data/updates/.gitkeep
 !data/sessions/.gitkeep
 !data/logs/.gitkeep
 

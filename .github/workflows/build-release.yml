@@ -87,6 +87,8 @@ jobs:
 
             mkdir -p "${package_dir}/data/downloads"
             mkdir -p "${package_dir}/data/extracted"
+            mkdir -p "${package_dir}/data/rubrics"
+            mkdir -p "${package_dir}/data/updates"
             mkdir -p "${package_dir}/data/sessions"
             mkdir -p "${package_dir}/data/logs"
 
@@ -95,6 +97,8 @@ jobs:
             cp -R src/web/dist "${package_dir}/web-dist"
             touch "${package_dir}/data/downloads/.gitkeep"
             touch "${package_dir}/data/extracted/.gitkeep"
+            touch "${package_dir}/data/rubrics/.gitkeep"
+            touch "${package_dir}/data/updates/.gitkeep"
             touch "${package_dir}/data/sessions/.gitkeep"
             touch "${package_dir}/data/logs/.gitkeep"
 
