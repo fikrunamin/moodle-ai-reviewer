@@ -1,0 +1,160 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: "Create a GitHub Release"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+      release_tag:
+        description: "Release tag, for example v0.1.0"
+        required: false
+        default: "v0.1.0"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Release Packages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install backend dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install web dependencies
+        working-directory: src/web
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck backend
+        run: bun run typecheck
+
+      - name: Typecheck web
+        working-directory: src/web
+        run: bun run typecheck
+
+      - name: Build web
+        run: bun run build:web
+
+      - name: Build Windows executable
+        run: bun run build:windows
+
+      - name: Build macOS executables
+        run: bun run build:macos
+
+      - name: Prepare package
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION="$(bun -e "console.log(require('./package.json').version)")"
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && -n "${{ inputs.release_tag }}" ]]; then
+            VERSION="${{ inputs.release_tag }}"
+            VERSION="${VERSION#v}"
+          fi
+
+          package_platform() {
+            local platform="$1"
+            local binary_source="$2"
+            local binary_name="$3"
+            local package_name="moodle-ai-reviewer-v${VERSION}-${platform}"
+            local package_dir="dist/release/${package_name}"
+
+            mkdir -p "${package_dir}/data/downloads"
+            mkdir -p "${package_dir}/data/extracted"
+            mkdir -p "${package_dir}/data/sessions"
+            mkdir -p "${package_dir}/data/logs"
+
+            cp "${binary_source}" "${package_dir}/${binary_name}"
+            cp README.md PRD.md AGENT.md RUBRIC.md SCRAPING_GUIDE.md AI_PROMPTS.md DATABASE_SCHEMA.md DEVELOPMENT_RULES.md .env.example "${package_dir}/"
+            cp -R src/web/dist "${package_dir}/web-dist"
+            touch "${package_dir}/data/downloads/.gitkeep"
+            touch "${package_dir}/data/extracted/.gitkeep"
+            touch "${package_dir}/data/sessions/.gitkeep"
+            touch "${package_dir}/data/logs/.gitkeep"
+
+            (
+              cd dist/release
+              zip -r "${package_name}.zip" "${package_name}"
+              tar -czf "${package_name}.tar.gz" "${package_name}"
+            )
+          }
+
+          package_platform "windows-x64" "moodle-reviewer.exe" "moodle-reviewer.exe"
+          package_platform "macos-arm64" "moodle-reviewer-macos-arm64" "moodle-reviewer"
+          package_platform "macos-x64" "moodle-reviewer-macos-x64" "moodle-reviewer"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: moodle-ai-reviewer-release-packages
+          path: |
+            dist/release/*.zip
+            dist/release/*.tar.gz
+          if-no-files-found: error
+
+      - name: Resolve release tag
+        if: github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && inputs.create_release == 'true')
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            RELEASE_TAG="${GITHUB_REF_NAME}"
+          else
+            RELEASE_TAG="${{ inputs.release_tag }}"
+          fi
+
+          echo "RELEASE_TAG=${RELEASE_TAG}" >> "${GITHUB_ENV}"
+
+      - name: Create tag for manual release
+        if: github.event_name == 'workflow_dispatch' && inputs.create_release == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if ! git rev-parse "${RELEASE_TAG}" >/dev/null 2>&1; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag "${RELEASE_TAG}"
+            git push origin "${RELEASE_TAG}"
+          fi
+
+      - name: Publish GitHub Release
+        if: github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && inputs.create_release == 'true')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          gh release create "${RELEASE_TAG}" \
+            dist/release/*.zip \
+            dist/release/*.tar.gz \
+            --title "Moodle AI Review Assistant ${RELEASE_TAG}" \
+            --notes "Windows x64 build. Download the zip or tar.gz asset below."

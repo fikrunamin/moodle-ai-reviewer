@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Bun
+.bun/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Build outputs
+dist/
+build/
+src/web/dist/
+moodle-reviewer.exe
+moodle-reviewer-macos-arm64
+moodle-reviewer-macos-x64
+
+# Runtime data
+data/app.sqlite
+data/app.sqlite-*
+data/downloads/*
+data/extracted/*
+data/sessions/*
+data/logs/*
+
+# Keep runtime folders
+!data/downloads/.gitkeep
+!data/extracted/.gitkeep
+!data/sessions/.gitkeep
+!data/logs/.gitkeep
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+bun-debug.log*
+
+# OS and editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
