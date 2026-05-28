@@ -3,6 +3,7 @@ import { z } from "zod";
 import { MoodleActivityService } from "../moodle/moodle-activity.service";
 import { syncQueue } from "../jobs/queues";
 import { syncActivityJob } from "../jobs/sync-activity.job";
+import { ActivityRepository } from "../database/repositories/activity.repository";
 
 export function registerActivityRoutes(app: Hono) {
   const service = new MoodleActivityService();
@@ -13,7 +14,7 @@ export function registerActivityRoutes(app: Hono) {
     const body = z
       .object({
         type: z.enum(["assignment", "discussion"]),
-        title: z.string().min(1),
+        title: z.string().optional(),
         url: z.string().url(),
       })
       .parse(await c.req.json());
@@ -23,6 +24,7 @@ export function registerActivityRoutes(app: Hono) {
 
   app.post("/api/activities/:activityId/sync", (c) => {
     const activityId = c.req.param("activityId");
+    new ActivityRepository().updateSyncStatus(activityId, "syncing");
     syncQueue.enqueue(async () => {
       await syncActivityJob(activityId);
     });

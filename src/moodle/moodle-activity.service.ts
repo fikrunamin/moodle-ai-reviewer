@@ -8,7 +8,7 @@ export class MoodleActivityService {
     return this.activities.list();
   }
 
-  addActivity(input: { type: ActivityType; title: string; url: string }) {
+  addActivity(input: { type: ActivityType; title?: string; url: string }) {
     return this.activities.create(input);
   }
 }

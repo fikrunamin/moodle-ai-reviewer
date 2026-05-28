@@ -15,6 +15,8 @@ export async function migrate() {
   getDb().exec(sql);
   ensureColumn("moodle_activities", "instruction", "TEXT");
   ensureColumn("moodle_activities", "prompt", "TEXT");
+  ensureColumn("moodle_activities", "course_context", "TEXT");
   ensureColumn("moodle_activities", "sync_error", "TEXT");
   ensureColumn("moodle_students", "interaction_count", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn("ai_assessments", "is_obsolete", "INTEGER NOT NULL DEFAULT 0");
 }

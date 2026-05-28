@@ -3,6 +3,18 @@ import { nanoid } from "nanoid";
 import type { MoodleSubmission, MoodleSubmissionFile } from "../../shared/types";
 
 export class SubmissionRepository {
+  clearMoodleDataForActivity(activityId: string) {
+    const db = getDb();
+    const tx = db.transaction(() => {
+      db.query(
+        "DELETE FROM moodle_submission_files WHERE submission_id IN (SELECT id FROM moodle_submissions WHERE activity_id = ?)",
+      ).run(activityId);
+      db.query("DELETE FROM moodle_submissions WHERE activity_id = ?").run(activityId);
+      db.query("DELETE FROM moodle_discussion_posts WHERE activity_id = ?").run(activityId);
+    });
+    tx();
+  }
+
   findByStudent(studentId: string) {
     return getDb()
       .query("SELECT * FROM moodle_submissions WHERE student_id = ? ORDER BY created_at DESC LIMIT 1")

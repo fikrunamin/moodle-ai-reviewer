@@ -20,6 +20,7 @@ export async function generateDiscussionReviewJob(studentId: string) {
   students.updateAiStatus(studentId, "processing");
   try {
     const result = await new DiscussionReviewAgent().review({
+      courseContext: activity.course_context,
       prompt: activity.prompt ?? "",
       posts: posts.map((post) => post.content).join("\n\n"),
       interactionCount: student.interaction_count,

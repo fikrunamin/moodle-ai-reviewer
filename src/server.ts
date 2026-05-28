@@ -49,6 +49,7 @@ export function startServer(port: number) {
 
   const server = Bun.serve({
     port,
+    idleTimeout: Number(process.env.SERVER_IDLE_TIMEOUT_SECONDS ?? 90),
     fetch: app.fetch,
   });
 

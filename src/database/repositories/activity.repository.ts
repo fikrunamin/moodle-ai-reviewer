@@ -9,11 +9,12 @@ export class ActivityRepository {
       .all() as MoodleActivity[];
   }
 
-  create(input: { type: ActivityType; title: string; url: string }): MoodleActivity {
+  create(input: { type: ActivityType; title?: string; url: string }): MoodleActivity {
     const id = nanoid();
+    const title = input.title?.trim() || "Pending sync";
     getDb()
       .query("INSERT INTO moodle_activities (id, type, title, url) VALUES (?, ?, ?, ?)")
-      .run(id, input.type, input.title, input.url);
+      .run(id, input.type, title, input.url);
     return getDb().query("SELECT * FROM moodle_activities WHERE id = ?").get(id) as MoodleActivity;
   }
 
@@ -29,12 +30,12 @@ export class ActivityRepository {
       .run(status, syncError, status, id);
   }
 
-  updateScrapedContent(id: string, input: { title?: string; instruction?: string | null; prompt?: string | null }) {
+  updateScrapedContent(id: string, input: { title?: string; instruction?: string | null; prompt?: string | null; courseContext?: string | null }) {
     getDb()
       .query(
-        "UPDATE moodle_activities SET title = COALESCE(?, title), instruction = COALESCE(?, instruction), prompt = COALESCE(?, prompt), updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+        "UPDATE moodle_activities SET title = COALESCE(?, title), instruction = COALESCE(?, instruction), prompt = COALESCE(?, prompt), course_context = COALESCE(?, course_context), updated_at = CURRENT_TIMESTAMP WHERE id = ?",
       )
-      .run(input.title ?? null, input.instruction ?? null, input.prompt ?? null, id);
+      .run(input.title ?? null, input.instruction ?? null, input.prompt ?? null, input.courseContext ?? null, id);
   }
 
   refreshCounts(id: string) {

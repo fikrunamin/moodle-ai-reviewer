@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "../../api/client";
 import { CopyFeedbackBox } from "./CopyFeedbackBox";
 import { RubricScore } from "./RubricScore";
-import { Wand2 } from "lucide-react";
 
 interface Assessment {
   summary: string;
@@ -10,12 +9,13 @@ interface Assessment {
   recommended_score: number;
   manual_review_required: number;
   manual_review_reason: string | null;
+  is_obsolete: number;
   scores?: Array<{ criteria_name: string; criteria_score: number; max_score: number }>;
 }
 
 interface Detail {
   student: { student_name: string; interaction_count: number };
-  activity: { type: "assignment" | "discussion"; title: string; instruction: string | null; prompt: string | null };
+  activity: { type: "assignment" | "discussion"; title: string; course_context: string | null; instruction: string | null; prompt: string | null };
   submission: { submission_text: string | null; extracted_text: string | null } | null;
   files: Array<{ filename: string; file_path: string; extracted_text_path: string | null }>;
   posts: Array<{ content: string; reply_to: string | null }>;
@@ -25,6 +25,7 @@ export function AssessmentDetailPanel({ studentId, activityType }: { studentId: 
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [busy, setBusy] = useState(false);
+  const [generateStatus, setGenerateStatus] = useState<string | null>(null);
 
   const refresh = () => {
     if (!studentId) {
@@ -47,78 +48,114 @@ export function AssessmentDetailPanel({ studentId, activityType }: { studentId: 
   async function generate() {
     if (!studentId) return;
     setBusy(true);
+    setGenerateStatus("Generating review...");
     try {
       await apiPost(`/api/students/${studentId}/generate`);
+      setGenerateStatus("Review generated");
       refresh();
+    } catch (error) {
+      setGenerateStatus(error instanceof Error ? error.message : "Generate failed");
     } finally {
       setBusy(false);
     }
   }
 
   if (!studentId) {
-    return <p className="p-4 text-sm text-slate-500">Pilih mahasiswa untuk melihat review.</p>;
+    return <div className="win-window h-full"><div className="win-titlebar">Preview</div><p className="p-2">Pilih mahasiswa untuk melihat review.</p></div>;
   }
 
   const type = detail?.activity.type ?? activityType;
 
   return (
-    <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
-      <div className="flex items-start justify-between gap-3">
+    <div className="win-window win-scroll flex h-full flex-col gap-2 overflow-y-auto">
+      <div className="win-titlebar">
         <div>
           <h2 className="font-semibold">{detail?.student.student_name ?? "Assessment"}</h2>
-          <p className="text-xs text-slate-500">{type ?? "No activity selected"}</p>
+          <p>{type ?? "No activity selected"}</p>
         </div>
-        <button className="inline-flex items-center gap-2 rounded-md bg-teal-700 px-3 py-2 text-sm font-medium text-white disabled:opacity-50" disabled={busy} onClick={generate}>
-          <Wand2 size={16} /> Generate
+        <button className="win-button" disabled={busy} onClick={generate}>
+          {busy ? "⏳ Generating" : "✨ Generate"}
         </button>
       </div>
+      <div className="grid gap-2 p-2">
+      {generateStatus ? <p className="win-status">{generateStatus}</p> : null}
+      {assessment?.is_obsolete ? (
+        <p className="win-status">⚠️ Review AI ini obsolete karena data Moodle sudah disinkron ulang. Generate ulang untuk assessment terbaru.</p>
+      ) : null}
 
       {type === "assignment" ? (
         <section className="grid gap-3">
-          <h3 className="text-sm font-semibold">Assignment Evidence</h3>
-          <div className="rounded-md border border-slate-200 p-3">
-            <p className="mb-2 text-xs font-medium text-slate-500">Preview file/PDF</p>
-            {detail?.files.length ? detail.files.map((file) => <p className="text-sm" key={file.file_path}>{file.filename}</p>) : <p className="text-sm text-slate-500">Belum ada file PDF.</p>}
+          <h3 className="win-section-title">Assignment Evidence</h3>
+          <div className="win-inset p-2">
+            <p className="font-bold">Judul tugas</p>
+            <p className="text-sm font-medium">{detail?.activity.title ?? "-"}</p>
           </div>
-          <div className="rounded-md border border-slate-200 p-3">
-            <p className="mb-2 text-xs font-medium text-slate-500">Extracted text</p>
+          <div className="win-inset p-2">
+            <p className="font-bold">Konteks mata kuliah</p>
+            <p className="text-sm leading-6">{detail?.activity.course_context ?? "-"}</p>
+          </div>
+          <div className="win-inset p-2">
+            <p className="font-bold">Arahan tugas</p>
+            <p className="max-h-48 overflow-auto text-sm leading-6">{detail?.activity.instruction ?? "-"}</p>
+          </div>
+          <div className="win-inset p-2">
+            <p className="font-bold">Preview file/PDF</p>
+            {detail?.files.length ? (
+              <div className="grid gap-2">
+                {detail.files.map((file) => (
+                  <div key={file.file_path} className="grid gap-2">
+                    <p className="text-sm font-medium">{file.filename}</p>
+                    <iframe
+                      className="win-inset h-80 w-full"
+                      title={file.filename}
+                      src={`/api/files/preview?path=${encodeURIComponent(file.file_path)}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p>Belum ada file PDF.</p>
+            )}
+          </div>
+          <div className="win-inset p-2">
+            <p className="font-bold">Extracted text</p>
             <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-xs leading-5">{detail?.submission?.extracted_text || detail?.submission?.submission_text || "Belum ada teks submission."}</pre>
           </div>
         </section>
       ) : (
         <section className="grid gap-3">
-          <h3 className="text-sm font-semibold">Discussion Evidence</h3>
-          <div className="rounded-md border border-slate-200 p-3">
-            <p className="mb-1 text-xs font-medium text-slate-500">Thread title</p>
+          <h3 className="win-section-title">Discussion Evidence</h3>
+          <div className="win-inset p-2">
+            <p className="font-bold">Thread title</p>
             <p className="text-sm">{detail?.activity.title ?? "-"}</p>
           </div>
-          <div className="rounded-md border border-slate-200 p-3">
-            <p className="mb-1 text-xs font-medium text-slate-500">Prompt diskusi</p>
+          <div className="win-inset p-2">
+            <p className="font-bold">Prompt diskusi</p>
             <p className="text-sm leading-6">{detail?.activity.prompt ?? "-"}</p>
           </div>
-          <div className="rounded-md border border-slate-200 p-3">
-            <p className="mb-2 text-xs font-medium text-slate-500">Komentar dan reply mahasiswa · {detail?.student.interaction_count ?? 0} interactions</p>
+          <div className="win-inset p-2">
+            <p className="font-bold">Komentar dan reply mahasiswa · {detail?.student.interaction_count ?? 0} interactions</p>
             <div className="grid max-h-52 gap-2 overflow-auto">
-              {detail?.posts.length ? detail.posts.map((post, index) => <p className="rounded bg-slate-50 p-2 text-sm leading-6" key={index}>{post.content}</p>) : <p className="text-sm text-slate-500">Belum ada komentar.</p>}
+              {detail?.posts.length ? detail.posts.map((post, index) => <p className="win-status text-sm leading-6" key={index}>{post.content}</p>) : <p>Belum ada komentar.</p>}
             </div>
           </div>
         </section>
       )}
 
       {!assessment ? (
-        <p className="rounded-md border border-slate-200 p-3 text-sm text-slate-500">Belum ada assessment.</p>
+        <p className="win-status">Belum ada assessment.</p>
       ) : (
         <section className="grid gap-3">
           <div className="flex items-end justify-between border-b border-slate-200 pb-3">
             <span className="text-sm font-medium">Recommended score</span>
             <strong className="text-4xl tabular-nums">{assessment.recommended_score}</strong>
           </div>
-          <div className="rounded-md border border-slate-200 p-3">
-            <p className="mb-1 text-xs font-medium text-slate-500">Summary</p>
+          <div className="win-inset p-2">
+            <p className="font-bold">Summary</p>
             <p className="text-sm leading-6">{assessment.summary}</p>
           </div>
           {assessment.manual_review_required ? (
-            <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">{assessment.manual_review_reason ?? "Perlu review manual."}</p>
+            <p className="win-status">⚠️ {assessment.manual_review_reason ?? "Perlu review manual."}</p>
           ) : null}
           <div className="grid gap-2">
             {(assessment.scores ?? []).map((score) => (
@@ -128,6 +165,7 @@ export function AssessmentDetailPanel({ studentId, activityType }: { studentId: 
           <CopyFeedbackBox feedback={assessment.feedback} />
         </section>
       )}
+      </div>
     </div>
   );
 }

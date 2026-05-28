@@ -1,3 +1,5 @@
+import { logger } from "../shared/logger";
+
 type Job = () => Promise<void>;
 
 export class JobQueue {
@@ -24,6 +26,8 @@ export class JobQueue {
       if (job) {
         try {
           await job();
+        } catch (error) {
+          logger.error("Queued job failed", error);
         } finally {
           this.pending -= 1;
         }

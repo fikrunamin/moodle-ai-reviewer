@@ -9,6 +9,7 @@ export interface MoodleActivity {
   type: ActivityType;
   title: string;
   url: string;
+  course_context: string | null;
   instruction: string | null;
   prompt: string | null;
   sync_status: SyncStatus;
@@ -94,6 +95,7 @@ export interface AiAssessment {
   recommended_score: number;
   manual_review_required: boolean;
   manual_review_reason: string | null;
+  is_obsolete: number;
   raw_json: unknown;
   created_at: string;
 }

@@ -12,19 +12,73 @@ export interface ScrapedAssignmentStudent {
 
 export interface ScrapedAssignment {
   title: string;
+  courseContext: string;
   instruction: string;
   students: ScrapedAssignmentStudent[];
 }
 
 export class MoodleAssignmentScraper {
-  async scrape(page: Page): Promise<ScrapedAssignment> {
+  async scrapeOverview(page: Page): Promise<Pick<ScrapedAssignment, "title" | "instruction" | "courseContext">> {
     return page.evaluate((selectors) => {
       const text = (element: Element | null) => element?.textContent?.replace(/\s+/g, " ").trim() ?? "";
       const title = text(document.querySelector(selectors.activityTitle)) || document.title || "Moodle Assignment";
-      const instruction = text(document.querySelector(selectors.regionMain));
-      const rows = Array.from(document.querySelectorAll("tr")).filter((row) => row.textContent?.trim());
+      const breadcrumb = Array.from(document.querySelectorAll(".breadcrumb a, nav[aria-label='breadcrumb'] a, .breadcrumb-item a"))
+        .map((element) => text(element))
+        .filter(Boolean);
+      const courseHeading =
+        text(document.querySelector(".page-header-headings h1")) ||
+        text(document.querySelector("h1")) ||
+        document.title;
+      const courseContext = Array.from(new Set([...breadcrumb, courseHeading])).join(" > ");
+      const instruction =
+        text(document.querySelector("#intro")) ||
+        text(document.querySelector(".activity-description")) ||
+        text(document.querySelector(".box.generalbox")) ||
+        text(document.querySelector(selectors.regionMain));
 
-      const students = rows
+      return { title, instruction, courseContext };
+    }, moodleSelectors);
+  }
+
+  async showAllGradingRows(page: Page) {
+    const perPageUrl = new URL(page.url());
+    perPageUrl.searchParams.set("perpage", "5000");
+    perPageUrl.searchParams.set("page", "0");
+    await page.goto(perPageUrl.href, { waitUntil: "networkidle2", timeout: 45_000 }).catch(() => null);
+
+    const selectInfo = await page.evaluate(() => {
+      const selects = Array.from(document.querySelectorAll("select"));
+      const select = selects.find((item) => {
+        const name = item.getAttribute("name")?.toLowerCase() ?? "";
+        const id = item.getAttribute("id")?.toLowerCase() ?? "";
+        return name.includes("perpage") || id.includes("perpage");
+      }) as HTMLSelectElement | undefined;
+      if (!select) return null;
+      const options = Array.from(select.options)
+        .map((option) => ({ value: option.value, label: option.textContent?.trim() ?? "" }))
+        .filter((option) => option.value);
+      const all = options.find((option) => /all|semua/i.test(option.label));
+      const numeric = options
+        .map((option) => ({ ...option, number: Number(option.value) }))
+        .filter((option) => Number.isFinite(option.number))
+        .sort((a, b) => b.number - a.number)[0];
+      return { selector: select.name ? `select[name="${select.name}"]` : `#${select.id}`, value: all?.value ?? numeric?.value ?? null };
+    });
+
+    if (selectInfo?.value) {
+      await Promise.all([
+        page.waitForNavigation({ waitUntil: "networkidle2", timeout: 15_000 }).catch(() => null),
+        page.select(selectInfo.selector, selectInfo.value),
+      ]);
+    }
+  }
+
+  async scrapeGrading(page: Page): Promise<ScrapedAssignmentStudent[]> {
+    return page.evaluate((selectors) => {
+      const text = (element: Element | null) => element?.textContent?.replace(/\s+/g, " ").trim() ?? "";
+      const rows = Array.from(document.querySelectorAll("table tbody tr, tr")).filter((row) => row.textContent?.trim());
+
+      return rows
         .map((row) => {
           const rowText = text(row);
           const nameLink = row.querySelector("a[href*='user/view'], a[href*='profile']");
@@ -51,12 +105,6 @@ export class MoodleAssignmentScraper {
           };
         })
         .filter(Boolean) as ScrapedAssignmentStudent[];
-
-      return {
-        title,
-        instruction,
-        students: students.length > 0 ? students : [],
-      };
     }, moodleSelectors);
   }
 }

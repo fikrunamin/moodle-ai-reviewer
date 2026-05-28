@@ -1,5 +1,6 @@
 import { launchBrowser } from "../browser/puppeteer-client";
 import { ActivityRepository } from "../database/repositories/activity.repository";
+import { AssessmentRepository } from "../database/repositories/assessment.repository";
 import { StudentRepository } from "../database/repositories/student.repository";
 import { SubmissionRepository } from "../database/repositories/submission.repository";
 import { extractPdfText } from "../pdf/pdf-extractor";
@@ -10,9 +11,27 @@ import { MoodleDiscussionScraper } from "./moodle-discussion.scraper";
 import { MoodleDownloadService } from "./moodle-download.service";
 import { getDb } from "../database/db";
 import { nanoid } from "nanoid";
+import type { Browser } from "puppeteer-core";
+
+function assignmentMainUrl(url: string) {
+  const parsed = new URL(url);
+  parsed.searchParams.delete("action");
+  parsed.searchParams.delete("page");
+  parsed.searchParams.delete("perpage");
+  return parsed.href;
+}
+
+function assignmentGradingUrl(url: string) {
+  const parsed = new URL(url);
+  parsed.searchParams.set("action", "grading");
+  parsed.searchParams.set("page", "0");
+  parsed.searchParams.set("perpage", "5000");
+  return parsed.href;
+}
 
 export class MoodleSyncService {
   private readonly activities = new ActivityRepository();
+  private readonly assessments = new AssessmentRepository();
   private readonly students = new StudentRepository();
   private readonly submissions = new SubmissionRepository();
   private readonly downloader = new MoodleDownloadService();
@@ -22,18 +41,30 @@ export class MoodleSyncService {
     if (!activity) throw new Error("Activity not found");
 
     this.activities.updateSyncStatus(activityId, "syncing");
-    const browser = await launchBrowser();
-    const page = await browser.newPage();
+    let browser: Browser | null = null;
 
     try {
+      browser = await launchBrowser();
+      const page = await browser.newPage();
       await new MoodleAuthService().applyCookies(page);
-      await page.goto(activity.url, { waitUntil: "networkidle2", timeout: 45_000 });
+      this.assessments.markActivityObsolete(activityId);
+      this.submissions.clearMoodleDataForActivity(activityId);
 
       if (activity.type === "assignment") {
-        const scraped = await new MoodleAssignmentScraper().scrape(page);
-        this.activities.updateScrapedContent(activityId, { title: scraped.title, instruction: scraped.instruction });
+        const scraper = new MoodleAssignmentScraper();
+        await page.goto(assignmentMainUrl(activity.url), { waitUntil: "networkidle2", timeout: 45_000 });
+        const overview = await scraper.scrapeOverview(page);
+        this.activities.updateScrapedContent(activityId, {
+          title: overview.title,
+          instruction: overview.instruction,
+          courseContext: overview.courseContext,
+        });
 
-        for (const item of scraped.students) {
+        await page.goto(assignmentGradingUrl(activity.url), { waitUntil: "networkidle2", timeout: 45_000 });
+        await scraper.showAllGradingRows(page);
+        const students = await scraper.scrapeGrading(page);
+
+        for (const item of students) {
           const student = this.students.upsert({
             activityId,
             studentName: item.studentName,
@@ -83,6 +114,7 @@ export class MoodleSyncService {
           }
         }
       } else {
+        await page.goto(activity.url, { waitUntil: "networkidle2", timeout: 45_000 });
         const scraped = await new MoodleDiscussionScraper().scrape(page);
         this.activities.updateScrapedContent(activityId, { title: scraped.title, prompt: scraped.prompt });
         const db = getDb();
@@ -121,7 +153,7 @@ export class MoodleSyncService {
       logger.error("Sync failed", error);
       return this.activities.find(activityId);
     } finally {
-      await browser.close().catch(() => null);
+      await browser?.close().catch(() => null);
     }
   }
 }

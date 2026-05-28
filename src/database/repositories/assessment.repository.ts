@@ -15,6 +15,10 @@ export class AssessmentRepository {
       .all(assessmentId) as AssessmentScore[];
   }
 
+  markActivityObsolete(activityId: string) {
+    getDb().query("UPDATE ai_assessments SET is_obsolete = 1 WHERE activity_id = ?").run(activityId);
+  }
+
   create(input: {
     activityId: string;
     studentId: string;

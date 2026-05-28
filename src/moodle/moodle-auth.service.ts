@@ -15,6 +15,33 @@ function normalizeSameSite(value: unknown): CookieParam["sameSite"] | undefined 
   return undefined;
 }
 
+function normalizeExpires(cookie: Record<string, unknown>) {
+  const expires = cookie.expires ?? cookie.expirationDate;
+  if (typeof expires !== "number" || expires <= 0) return undefined;
+  return expires;
+}
+
+function normalizeCookieEditorCookie(cookie: Record<string, unknown>, fallbackUrl: URL): CookieParam {
+  if (typeof cookie.name !== "string" || cookie.name.length === 0) {
+    throw new Error("Cookie JSON tidak valid: field name wajib ada");
+  }
+
+  if (typeof cookie.value !== "string") {
+    throw new Error(`Cookie JSON tidak valid: field value wajib string untuk ${cookie.name}`);
+  }
+
+  return {
+    name: cookie.name,
+    value: cookie.value,
+    domain: typeof cookie.domain === "string" && cookie.domain ? cookie.domain : fallbackUrl.hostname,
+    path: typeof cookie.path === "string" && cookie.path ? cookie.path : "/",
+    expires: normalizeExpires(cookie),
+    httpOnly: Boolean(cookie.httpOnly),
+    secure: typeof cookie.secure === "boolean" ? cookie.secure : fallbackUrl.protocol === "https:",
+    sameSite: normalizeSameSite(cookie.sameSite),
+  };
+}
+
 function parseCookieInput(input: { baseUrl: string; cookies: string }): CookieParam[] {
   const url = new URL(input.baseUrl);
   const raw = input.cookies.trim();
@@ -24,16 +51,7 @@ function parseCookieInput(input: { baseUrl: string; cookies: string }): CookiePa
     const parsed = JSON.parse(raw);
     const cookies = Array.isArray(parsed) ? parsed : parsed.cookies;
     if (!Array.isArray(cookies)) throw new Error("JSON cookies harus berupa array atau object { cookies: [] }");
-    return cookies.map((cookie) => ({
-      name: String(cookie.name),
-      value: String(cookie.value),
-      domain: cookie.domain ? String(cookie.domain) : url.hostname,
-      path: cookie.path ? String(cookie.path) : "/",
-      expires: typeof cookie.expires === "number" && cookie.expires > 0 ? cookie.expires : undefined,
-      httpOnly: Boolean(cookie.httpOnly),
-      secure: cookie.secure ?? url.protocol === "https:",
-      sameSite: normalizeSameSite(cookie.sameSite),
-    }));
+    return cookies.map((cookie) => normalizeCookieEditorCookie(cookie as Record<string, unknown>, url));
   }
 
   return raw

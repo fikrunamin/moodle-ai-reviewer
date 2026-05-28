@@ -12,7 +12,8 @@ export async function launchBrowser(): Promise<Browser> {
 
   return puppeteer.launch({
     executablePath,
-    headless: false,
+    headless: process.env.PUPPETEER_HEADLESS !== "false",
     userDataDir: paths.sessions,
+    args: ["--no-first-run", "--no-default-browser-check"],
   });
 }

@@ -20,9 +20,18 @@ export function registerAssessmentRoutes(app: Hono) {
     if (!student) return c.json({ error: "Student not found" }, 404);
     const activity = new ActivityRepository().find(student.activity_id);
     if (!activity) return c.json({ error: "Activity not found" }, 404);
-    const result =
-      activity.type === "assignment" ? await generateAssignmentReviewJob(studentId) : await generateDiscussionReviewJob(studentId);
-    return c.json(result);
+    try {
+      const result =
+        activity.type === "assignment" ? await generateAssignmentReviewJob(studentId) : await generateDiscussionReviewJob(studentId);
+      return c.json(result);
+    } catch (error) {
+      return c.json(
+        {
+          error: error instanceof Error ? error.message : "Generate review failed",
+        },
+        502,
+      );
+    }
   });
 
   app.post("/api/assessments/generate-bulk", async (c) => {
@@ -39,6 +48,7 @@ export function registerAssessmentRoutes(app: Hono) {
       const student = students.find(studentId);
       if (!student) continue;
       if (body.mode === "missing" && student.ai_status === "completed") continue;
+      students.updateAiStatus(studentId, "processing");
       aiQueue.enqueue(async () => {
         const activity = activities.find(student.activity_id);
         if (!activity) return;

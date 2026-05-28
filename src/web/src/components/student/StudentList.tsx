@@ -23,6 +23,8 @@ export function StudentList({ activityId, selectedStudentId, onSelectStudent }: 
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
+  const [jobStatus, setJobStatus] = useState<{ running: boolean; queued: number; pending: number } | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   const refresh = () => {
     if (!activityId) {
@@ -37,6 +39,20 @@ export function StudentList({ activityId, selectedStudentId, onSelectStudent }: 
     refresh();
   }, [activityId]);
 
+  useEffect(() => {
+    if (!jobStatus?.pending) return;
+    const timer = window.setInterval(() => {
+      apiGet<{ running: boolean; queued: number; pending: number }>("/api/jobs/ai")
+        .then((next) => {
+          setJobStatus(next);
+          if (next.pending === 0) setMessage("Bulk generate finished");
+        })
+        .catch(() => null);
+      refresh();
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [jobStatus?.pending, activityId]);
+
   const filtered = students.filter((student) => {
     const matchesSearch = student.student_name.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = status === "all" || student.ai_status === status;
@@ -47,19 +63,21 @@ export function StudentList({ activityId, selectedStudentId, onSelectStudent }: 
 
   async function generate(ids: string[], mode: "selected" | "missing" = "selected") {
     if (ids.length === 0) return;
-    await apiPost("/api/assessments/generate-bulk", { studentIds: ids, mode });
-    setTimeout(refresh, 800);
+    setMessage("Bulk generate queued");
+    const result = await apiPost<{ queue: { running: boolean; queued: number; pending: number } }>("/api/assessments/generate-bulk", { studentIds: ids, mode });
+    setJobStatus(result.queue);
+    refresh();
   }
 
   return (
-    <div className="flex h-full flex-col gap-3 p-4">
-      <div>
-        <h2 className="font-semibold">Mahasiswa</h2>
-        <p className="text-xs text-slate-500">{students.length} student records</p>
+    <div className="win-window flex h-full flex-col">
+      <div className="win-titlebar">
+        <span>Mahasiswa</span>
+        <span>{students.length} records</span>
       </div>
-      <div className="grid gap-2 xl:grid-cols-[1fr_160px]">
-        <input className="rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="Search mahasiswa" value={search} onChange={(event) => setSearch(event.target.value)} />
-        <select className="rounded-md border border-slate-300 px-2 py-2 text-sm" value={status} onChange={(event) => setStatus(event.target.value)}>
+      <div className="grid gap-1 p-2 xl:grid-cols-[1fr_130px]">
+        <input className="win-input" placeholder="Search mahasiswa" value={search} onChange={(event) => setSearch(event.target.value)} />
+        <select className="win-select" value={status} onChange={(event) => setStatus(event.target.value)}>
           <option value="all">All AI Status</option>
           <option value="pending">Pending</option>
           <option value="processing">Processing</option>
@@ -67,7 +85,7 @@ export function StudentList({ activityId, selectedStudentId, onSelectStudent }: 
           <option value="failed">Failed</option>
         </select>
       </div>
-      <label className="flex items-center gap-2 text-sm">
+      <label className="flex items-center gap-1 px-2 pb-1">
         <input
           type="checkbox"
           checked={allVisibleSelected}
@@ -78,15 +96,21 @@ export function StudentList({ activityId, selectedStudentId, onSelectStudent }: 
         Select all visible
       </label>
       <BulkActionBar
-        disabled={!activityId || selectedIds.length === 0}
-        missingDisabled={!activityId || students.length === 0}
+        disabled={!activityId || selectedIds.length === 0 || Boolean(jobStatus?.pending)}
+        missingDisabled={!activityId || students.length === 0 || Boolean(jobStatus?.pending)}
         onGenerateSelected={() => generate(selectedIds)}
         onGenerateMissing={() => generate(students.map((student) => student.id), "missing")}
         onRegenerateSelected={() => generate(selectedIds)}
       />
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+      {message || jobStatus?.pending ? (
+        <p className="win-status mx-2 mt-1">
+          {message}
+          {jobStatus?.pending ? ` · running ${jobStatus.running ? "yes" : "no"} · queued ${jobStatus.queued} · pending ${jobStatus.pending}` : ""}
+        </p>
+      ) : null}
+      <div className="win-inset win-scroll m-2 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-1">
       {filtered.length === 0 ? (
-        <p className="text-sm text-slate-500">Pilih activity untuk melihat mahasiswa.</p>
+        <p className="p-1">Pilih activity untuk melihat mahasiswa.</p>
       ) : (
         filtered.map((student) => (
           <StudentItem

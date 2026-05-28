@@ -4,6 +4,7 @@ import { registerActivityRoutes } from "./activity.routes";
 import { registerStudentRoutes } from "./student.routes";
 import { registerAssessmentRoutes } from "./assessment.routes";
 import { registerAiSettingRoutes } from "./ai-setting.routes";
+import { registerFileRoutes } from "./file.routes";
 
 export function registerRoutes(app: Hono) {
   app.onError((err, c) => {
@@ -16,4 +17,5 @@ export function registerRoutes(app: Hono) {
   registerStudentRoutes(app);
   registerAssessmentRoutes(app);
   registerAiSettingRoutes(app);
+  registerFileRoutes(app);
 }

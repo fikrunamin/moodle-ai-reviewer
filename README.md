@@ -4,7 +4,7 @@ Portable AI assistant untuk membantu dosen mereview assignment dan discussion Mo
 
 ## Main Features
 
-- Puppeteer non-headless
+- Puppeteer headless by default
 - Moodle read-only scraping
 - Assignment review
 - Discussion review
@@ -61,21 +61,33 @@ data/
   logs/
 ```
 
+## Puppeteer Mode
+
+Puppeteer berjalan headless agar Chrome tidak muncul setiap action.
+Untuk debug manual, jalankan:
+
+```bash
+PUPPETEER_HEADLESS=false bun run dev
+```
+
 ## Moodle Session
 
 Login Moodle dilakukan dengan paste cookies agar kompatibel dengan SSO/2FA.
 
 1. Login ke Moodle di browser biasa.
-2. Copy cookie dari domain Moodle sebagai raw `Cookie` header atau JSON cookies.
-3. Paste ke panel `Moodle Session Cookies`.
-4. Klik `Save Cookies`.
-5. Klik `Test Session`.
+2. Export cookie dari Cookie-Editor Chrome extension dalam format JSON, atau copy raw `Cookie` header.
+3. Buka `Settings`, pilih tab `Moodle Cookies`.
+4. Paste cookie ke form `Cookies JSON / Header`.
+5. Klik `Save Cookies`.
+6. Klik `Test Session`.
 
 Cookie disimpan lokal di:
 
 ```txt
 data/sessions/moodle-cookies.json
 ```
+
+Format JSON Cookie-Editor didukung, termasuk field `expirationDate`, `httpOnly`, `secure`, `sameSite`, `domain`, dan `path`.
 
 ## Local URL
 

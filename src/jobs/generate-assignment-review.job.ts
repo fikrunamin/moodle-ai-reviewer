@@ -19,6 +19,7 @@ export async function generateAssignmentReviewJob(studentId: string) {
   try {
     const missingPdf = !submission?.extracted_text;
     const result = await new AssignmentReviewAgent().review({
+      courseContext: activity.course_context,
       instruction: activity.instruction ?? "",
       submissionText: submission?.submission_text ?? "",
       extractedText: submission?.extracted_text ?? "",

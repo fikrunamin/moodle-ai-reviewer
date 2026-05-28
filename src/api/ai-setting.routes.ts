@@ -8,6 +8,7 @@ function maskSetting(setting: ReturnType<AiSettingRepository["getActive"]>) {
   return {
     ...setting,
     api_key_encrypted: setting.api_key_encrypted ? "********" : null,
+    has_api_key: Boolean(setting.api_key_encrypted),
   };
 }
 
@@ -15,7 +16,7 @@ export function registerAiSettingRoutes(app: Hono) {
   const schema = z.object({
     providerName: z.string().min(1),
     baseUrl: z.string().url(),
-    apiKey: z.string().min(1),
+    apiKey: z.string().optional(),
     modelName: z.string().min(1),
   });
 
@@ -31,11 +32,21 @@ export function registerAiSettingRoutes(app: Hono) {
 
   app.post("/api/ai-settings/test", async (c) => {
     const body = schema.parse(await c.req.json());
-    const result = await new AiClient({
-      baseUrl: body.baseUrl.replace(/\/$/, ""),
-      apiKey: body.apiKey,
-      model: body.modelName,
-    }).testConnection();
-    return c.json(result);
+    const active = new AiSettingRepository().getActive();
+    const apiKey = body.apiKey?.trim() && body.apiKey !== "********" ? body.apiKey : active?.api_key_encrypted;
+    if (!apiKey) {
+      return c.json({ error: "API key is required. Paste the real API key before testing." }, 400);
+    }
+
+    try {
+      const result = await new AiClient({
+        baseUrl: body.baseUrl.replace(/\/$/, ""),
+        apiKey,
+        model: body.modelName,
+      }).testConnection();
+      return c.json(result);
+    } catch (error) {
+      return c.json({ error: error instanceof Error ? error.message : "AI connection failed" }, 400);
+    }
   });
 }
