@@ -2,6 +2,7 @@ import type { Hono } from "hono";
 import { z } from "zod";
 import { AiSettingRepository } from "../database/repositories/ai-setting.repository";
 import { AiClient } from "../ai/ai-client";
+import { logger } from "../shared/logger";
 
 function maskSetting(setting: ReturnType<AiSettingRepository["getActive"]>) {
   if (!setting) return null;
@@ -46,6 +47,7 @@ export function registerAiSettingRoutes(app: Hono) {
       }).testConnection();
       return c.json(result);
     } catch (error) {
+      logger.error("AI connection test failed", error);
       return c.json({ error: error instanceof Error ? error.message : "AI connection failed" }, 400);
     }
   });

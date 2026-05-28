@@ -96,6 +96,15 @@ Format JSON Cookie-Editor didukung, termasuk field `expirationDate`, `httpOnly`,
 http://localhost:9876
 ```
 
+## Telegram Error Alert
+
+Isi `.env` jika ingin error aplikasi dikirim ke Telegram:
+
+```env
+TELEGRAM_BOT_TOKEN=123456:bot-token
+TELEGRAM_ACCOUNT_ID=123456789
+```
+
 ## Important Rule
 
 Aplikasi ini read-only terhadap Moodle.

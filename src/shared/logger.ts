@@ -1,3 +1,5 @@
+import { sendTelegramError } from "./telegram-notifier";
+
 export const logger = {
   info(message: string, meta?: unknown) {
     console.log(`[info] ${message}`, meta ?? "");
@@ -7,5 +9,6 @@ export const logger = {
   },
   error(message: string, meta?: unknown) {
     console.error(`[error] ${message}`, meta ?? "");
+    void sendTelegramError(message, meta);
   },
 };

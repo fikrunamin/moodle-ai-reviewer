@@ -5,10 +5,11 @@ import { registerStudentRoutes } from "./student.routes";
 import { registerAssessmentRoutes } from "./assessment.routes";
 import { registerAiSettingRoutes } from "./ai-setting.routes";
 import { registerFileRoutes } from "./file.routes";
+import { logger } from "../shared/logger";
 
 export function registerRoutes(app: Hono) {
   app.onError((err, c) => {
-    console.error(err);
+    logger.error("Unhandled API error", err);
     return c.json({ error: err instanceof Error ? err.message : "Unexpected error" }, 500);
   });
 

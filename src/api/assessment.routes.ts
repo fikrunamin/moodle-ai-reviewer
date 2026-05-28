@@ -5,6 +5,7 @@ import { ActivityRepository } from "../database/repositories/activity.repository
 import { generateAssignmentReviewJob } from "../jobs/generate-assignment-review.job";
 import { generateDiscussionReviewJob } from "../jobs/generate-discussion-review.job";
 import { aiQueue } from "../jobs/queues";
+import { logger } from "../shared/logger";
 import { z } from "zod";
 
 export function registerAssessmentRoutes(app: Hono) {
@@ -25,6 +26,7 @@ export function registerAssessmentRoutes(app: Hono) {
         activity.type === "assignment" ? await generateAssignmentReviewJob(studentId) : await generateDiscussionReviewJob(studentId);
       return c.json(result);
     } catch (error) {
+      logger.error("Generate review failed", error);
       return c.json(
         {
           error: error instanceof Error ? error.message : "Generate review failed",
