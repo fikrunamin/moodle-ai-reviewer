@@ -13,6 +13,10 @@ interface Activity {
   sync_status: string;
   last_synced_at: string | null;
   sync_error: string | null;
+  rubric_status: string;
+  rubric_error: string | null;
+  rubric_extracted_text: string | null;
+  rubric_ai_json: string | null;
 }
 
 export function App() {
@@ -43,6 +47,10 @@ export function App() {
               setSelectedStudentId(null);
             }}
             onRefresh={refreshActivities}
+            onAddOptimistic={(activity) => {
+              setActivities((current) => [activity, ...current.filter((item) => item.id !== activity.id)]);
+              setSelectedActivityId(activity.id);
+            }}
             onOpenSettings={() => setSettingsOpen(true)}
           />
         }

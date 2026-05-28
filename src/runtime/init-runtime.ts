@@ -6,6 +6,7 @@ export async function initRuntime() {
     mkdir(paths.data, { recursive: true }),
     mkdir(paths.downloads, { recursive: true }),
     mkdir(paths.extracted, { recursive: true }),
+    mkdir(paths.rubrics, { recursive: true }),
     mkdir(paths.sessions, { recursive: true }),
     mkdir(paths.logs, { recursive: true }),
   ]);

@@ -1,14 +1,29 @@
 import { useState } from "react";
-import { apiPost } from "../../api/client";
+import { apiPostForm } from "../../api/client";
 
 interface Props {
   onClose: () => void;
   onCreated: () => void;
+  onCreatedActivity: (activity: CreatedActivity) => void;
 }
 
-export function AddActivityModal({ onClose, onCreated }: Props) {
+interface CreatedActivity {
+  id: string;
+  title: string;
+  type: "assignment" | "discussion";
+  sync_status: string;
+  last_synced_at: string | null;
+  sync_error: string | null;
+  rubric_status: string;
+  rubric_error: string | null;
+  rubric_extracted_text: string | null;
+  rubric_ai_json: string | null;
+}
+
+export function AddActivityModal({ onClose, onCreated, onCreatedActivity }: Props) {
   const [url, setUrl] = useState("");
   const [type, setType] = useState<"assignment" | "discussion">("assignment");
+  const [rubricFile, setRubricFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -17,7 +32,12 @@ export function AddActivityModal({ onClose, onCreated }: Props) {
     setBusy(true);
     setError(null);
     try {
-      await apiPost("/api/activities", { url, type });
+      const form = new FormData();
+      form.set("url", url);
+      form.set("type", type);
+      if (rubricFile) form.set("rubricFile", rubricFile);
+      const created = await apiPostForm<CreatedActivity>("/api/activities", form);
+      onCreatedActivity(created);
       onCreated();
       onClose();
     } catch (err) {
@@ -48,6 +68,11 @@ export function AddActivityModal({ onClose, onCreated }: Props) {
               <option value="discussion">Discussion</option>
             </select>
           </label>
+          <label className="win-field">
+            Rubrik PDF (opsional)
+            <input className="win-input" type="file" accept="application/pdf,.pdf" onChange={(event) => setRubricFile(event.target.files?.[0] ?? null)} />
+          </label>
+          {rubricFile ? <p className="win-status">📄 {rubricFile.name}</p> : <p className="win-status">Jika kosong, rubrik default akan digunakan.</p>}
           {error ? <p className="win-status">❌ {error}</p> : null}
         </div>
         <div className="flex justify-end gap-1 p-2">

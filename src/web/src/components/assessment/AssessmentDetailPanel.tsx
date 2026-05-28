@@ -15,7 +15,16 @@ interface Assessment {
 
 interface Detail {
   student: { student_name: string; interaction_count: number };
-  activity: { type: "assignment" | "discussion"; title: string; course_context: string | null; instruction: string | null; prompt: string | null };
+  activity: {
+    type: "assignment" | "discussion";
+    title: string;
+    course_context: string | null;
+    instruction: string | null;
+    prompt: string | null;
+    rubric_file_path: string | null;
+    rubric_ai_json: string | null;
+    rubric_extracted_text: string | null;
+  };
   submission: { submission_text: string | null; extracted_text: string | null } | null;
   files: Array<{ filename: string; file_path: string; extracted_text_path: string | null }>;
   posts: Array<{ content: string; reply_to: string | null }>;
@@ -97,6 +106,12 @@ export function AssessmentDetailPanel({ studentId, activityType }: { studentId: 
           <div className="win-inset p-2">
             <p className="font-bold">Arahan tugas</p>
             <p className="max-h-48 overflow-auto text-sm leading-6">{detail?.activity.instruction ?? "-"}</p>
+          </div>
+          <div className="win-inset p-2">
+            <p className="font-bold">Rubrik</p>
+            <pre className="max-h-40 overflow-auto whitespace-pre-wrap text-xs leading-5">
+              {detail?.activity.rubric_ai_json || detail?.activity.rubric_extracted_text || "Rubrik default digunakan."}
+            </pre>
           </div>
           <div className="win-inset p-2">
             <p className="font-bold">Preview file/PDF</p>

@@ -21,6 +21,7 @@ export async function generateDiscussionReviewJob(studentId: string) {
   try {
     const result = await new DiscussionReviewAgent().review({
       courseContext: activity.course_context,
+      rubricGuide: activity.rubric_ai_json ?? activity.rubric_extracted_text,
       prompt: activity.prompt ?? "",
       posts: posts.map((post) => post.content).join("\n\n"),
       interactionCount: student.interaction_count,

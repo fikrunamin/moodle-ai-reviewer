@@ -22,6 +22,7 @@ data/app.sqlite
 data/app.sqlite-*
 data/downloads/*
 data/extracted/*
+data/rubrics/*
 data/sessions/*
 data/logs/*
 data/sessions/moodle-cookies.json
@@ -29,6 +30,7 @@ data/sessions/moodle-cookies.json
 # Keep runtime folders
 !data/downloads/.gitkeep
 !data/extracted/.gitkeep
+!data/rubrics/.gitkeep
 !data/sessions/.gitkeep
 !data/logs/.gitkeep
 

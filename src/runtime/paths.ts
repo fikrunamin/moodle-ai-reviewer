@@ -8,6 +8,7 @@ export const paths = {
   database: join(root, "data", "app.sqlite"),
   downloads: join(root, "data", "downloads"),
   extracted: join(root, "data", "extracted"),
+  rubrics: join(root, "data", "rubrics"),
   sessions: join(root, "data", "sessions"),
   logs: join(root, "data", "logs"),
   webDist: join(root, "web-dist"),

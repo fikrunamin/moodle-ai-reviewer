@@ -29,9 +29,10 @@ export class AiClient {
     return new Error(`${prefix}: ${response.status}${detail}`);
   }
 
-  async completeJson(prompt: string) {
+  async completeJson(prompt: string, options: { timeoutMs?: number } = {}) {
     const response = await this.fetch(`${this.options.baseUrl}/chat/completions`, {
       method: "POST",
+      signal: options.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${this.options.apiKey}`,

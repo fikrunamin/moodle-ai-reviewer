@@ -12,6 +12,11 @@ export interface MoodleActivity {
   course_context: string | null;
   instruction: string | null;
   prompt: string | null;
+  rubric_file_path: string | null;
+  rubric_extracted_text: string | null;
+  rubric_ai_json: string | null;
+  rubric_status: string;
+  rubric_error: string | null;
   sync_status: SyncStatus;
   sync_error: string | null;
   last_synced_at: string | null;

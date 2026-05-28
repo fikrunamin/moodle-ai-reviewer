@@ -57,6 +57,7 @@ data/
   app.sqlite
   downloads/
   extracted/
+  rubrics/
   sessions/
   logs/
 ```

@@ -21,6 +21,7 @@ export async function generateAssignmentReviewJob(studentId: string) {
     const result = await new AssignmentReviewAgent().review({
       courseContext: activity.course_context,
       instruction: activity.instruction ?? "",
+      rubricGuide: activity.rubric_ai_json ?? activity.rubric_extracted_text,
       submissionText: submission?.submission_text ?? "",
       extractedText: submission?.extracted_text ?? "",
     });

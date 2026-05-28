@@ -4,7 +4,7 @@ import { buildAssignmentPrompt } from "./prompt-builder";
 export class AssignmentReviewAgent {
   constructor(private readonly provider = new AiProviderService()) {}
 
-  async review(input: { courseContext?: string | null; instruction: string; submissionText: string; extractedText?: string | null }) {
+  async review(input: { courseContext?: string | null; instruction: string; rubricGuide?: string | null; submissionText: string; extractedText?: string | null }) {
     return this.provider.getClient().completeJson(buildAssignmentPrompt(input));
   }
 }

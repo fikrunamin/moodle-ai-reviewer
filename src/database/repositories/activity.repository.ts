@@ -9,12 +9,19 @@ export class ActivityRepository {
       .all() as MoodleActivity[];
   }
 
-  create(input: { type: ActivityType; title?: string; url: string }): MoodleActivity {
+  create(input: {
+    type: ActivityType;
+    title?: string;
+    url: string;
+    rubricStatus?: string;
+  }): MoodleActivity {
     const id = nanoid();
     const title = input.title?.trim() || "Pending sync";
     getDb()
-      .query("INSERT INTO moodle_activities (id, type, title, url) VALUES (?, ?, ?, ?)")
-      .run(id, input.type, title, input.url);
+      .query(
+        "INSERT INTO moodle_activities (id, type, title, url, rubric_status) VALUES (?, ?, ?, ?, ?)",
+      )
+      .run(id, input.type, title, input.url, input.rubricStatus ?? "none");
     return getDb().query("SELECT * FROM moodle_activities WHERE id = ?").get(id) as MoodleActivity;
   }
 
@@ -48,5 +55,27 @@ export class ActivityRepository {
          WHERE id = ?`,
       )
       .run(id, id, id);
+  }
+
+  updateRubric(id: string, input: {
+    status: string;
+    filePath?: string | null;
+    extractedText?: string | null;
+    aiJson?: string | null;
+    error?: string | null;
+  }) {
+    getDb()
+      .query(
+        "UPDATE moodle_activities SET rubric_status = ?, rubric_file_path = COALESCE(?, rubric_file_path), rubric_extracted_text = COALESCE(?, rubric_extracted_text), rubric_ai_json = ?, rubric_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      )
+      .run(input.status, input.filePath ?? null, input.extractedText ?? null, input.aiJson ?? null, input.error ?? null, id);
+  }
+
+  updateRubricText(id: string, text: string) {
+    getDb()
+      .query(
+        "UPDATE moodle_activities SET rubric_status = 'ready', rubric_extracted_text = ?, rubric_ai_json = NULL, rubric_error = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      )
+      .run(text, id);
   }
 }

@@ -5,6 +5,7 @@ await rm(paths.data, { recursive: true, force: true });
 await Promise.all([
   mkdir(paths.downloads, { recursive: true }),
   mkdir(paths.extracted, { recursive: true }),
+  mkdir(paths.rubrics, { recursive: true }),
   mkdir(paths.sessions, { recursive: true }),
   mkdir(paths.logs, { recursive: true }),
 ]);
