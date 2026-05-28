@@ -27,6 +27,12 @@ export class SubmissionRepository {
       .all(submissionId) as MoodleSubmissionFile[];
   }
 
+  findFile(fileId: string) {
+    return getDb()
+      .query("SELECT * FROM moodle_submission_files WHERE id = ?")
+      .get(fileId) as MoodleSubmissionFile | null;
+  }
+
   upsert(input: {
     activityId: string;
     studentId: string;

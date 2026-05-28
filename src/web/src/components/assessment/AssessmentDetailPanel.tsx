@@ -26,7 +26,7 @@ interface Detail {
     rubric_extracted_text: string | null;
   };
   submission: { submission_text: string | null; extracted_text: string | null } | null;
-  files: Array<{ filename: string; file_path: string; extracted_text_path: string | null }>;
+  files: Array<{ id: string; filename: string; file_path: string; extracted_text_path: string | null }>;
   posts: Array<{ content: string; reply_to: string | null }>;
 }
 
@@ -123,8 +123,11 @@ export function AssessmentDetailPanel({ studentId, activityType }: { studentId: 
                     <iframe
                       className="win-inset h-80 w-full"
                       title={file.filename}
-                      src={`/api/files/preview?path=${encodeURIComponent(file.file_path)}`}
+                      src={`/api/files/${encodeURIComponent(file.id)}/preview`}
                     />
+                    <a className="win-button w-fit px-2 py-1" href={`/api/files/${encodeURIComponent(file.id)}/preview`} target="_blank" rel="noreferrer">
+                      🔎 Open PDF
+                    </a>
                   </div>
                 ))}
               </div>

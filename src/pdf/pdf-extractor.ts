@@ -57,9 +57,42 @@ export async function extractPdfText(filePath: string) {
   ensurePdfRuntimePolyfills();
   const { PDFParse } = await import("pdf-parse");
   const buffer = await readFile(filePath);
-  const parser = new PDFParse({ data: buffer });
-  const result = await parser.getText();
+  const parser = new PDFParse({
+    data: buffer,
+    stopAtErrors: false,
+    useWorkerFetch: false,
+    useWasm: false,
+    isEvalSupported: false,
+    disableFontFace: true,
+  });
+
+  let text = "";
+  try {
+    const info = await parser.getInfo();
+    const pageTexts: string[] = [];
+    const failedPages: number[] = [];
+
+    for (let page = 1; page <= info.total; page += 1) {
+      try {
+        const result = await parser.getText({
+          partial: [page],
+          pageJoiner: "\n-- page_number of total_number --",
+        });
+        pageTexts.push(result.text.trim());
+      } catch {
+        failedPages.push(page);
+      }
+    }
+
+    text = pageTexts.filter(Boolean).join("\n\n");
+    if (failedPages.length) {
+      text += `\n\n[PDF extraction warning: failed to extract page(s) ${failedPages.join(", ")}.]`;
+    }
+  } finally {
+    await parser.destroy().catch(() => null);
+  }
+
   const outputPath = join(paths.extracted, `${basename(filePath)}.txt`);
-  await writeFile(outputPath, result.text, "utf8");
-  return { text: result.text, outputPath };
+  await writeFile(outputPath, text, "utf8");
+  return { text, outputPath };
 }
