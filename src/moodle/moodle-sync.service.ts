@@ -9,6 +9,8 @@ import { MoodleAssignmentScraper } from "./moodle-assignment.scraper";
 import { MoodleAuthService } from "./moodle-auth.service";
 import { MoodleDiscussionScraper } from "./moodle-discussion.scraper";
 import { MoodleDownloadService } from "./moodle-download.service";
+import { extractPdfEnrichmentsJob } from "../jobs/extract-pdf-enrichments.job";
+import { enrichmentQueue } from "../jobs/queues";
 import { getDb } from "../database/db";
 import { nanoid } from "nanoid";
 import type { Browser } from "puppeteer-core";
@@ -112,6 +114,10 @@ export class MoodleSyncService {
               submittedAt: item.submittedAt,
             });
           }
+
+          enrichmentQueue.enqueue(() =>
+            extractPdfEnrichmentsJob({ submissionId, parseReferences: true }),
+          );
         }
       } else {
         await page.goto(activity.url, { waitUntil: "networkidle2", timeout: 45_000 });

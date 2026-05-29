@@ -3,12 +3,21 @@ import { isAbsolute, relative, resolve } from "node:path";
 import type { Hono } from "hono";
 import { paths } from "../runtime/paths";
 import { SubmissionRepository } from "../database/repositories/submission.repository";
+import { ReferenceRepository } from "../database/repositories/reference.repository";
+
+function isInsidePath(filePath: string, base: string) {
+  const resolved = resolve(filePath);
+  const baseResolved = resolve(base);
+  const relativePath = relative(baseResolved, resolved);
+  return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath));
+}
 
 function isInsideDownloads(filePath: string) {
-  const resolved = resolve(filePath);
-  const downloadsRoot = resolve(paths.downloads);
-  const relativePath = relative(downloadsRoot, resolved);
-  return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath));
+  return isInsidePath(filePath, paths.downloads);
+}
+
+function isInsideReferences(filePath: string) {
+  return isInsidePath(filePath, paths.references);
 }
 
 function pdfResponse(filePath: string) {
@@ -51,6 +60,22 @@ export function registerFileRoutes(app: Hono) {
       return c.json({ error: "File not found" }, 404);
     }
 
+    return pdfResponse(resolved);
+  });
+
+  app.get("/api/references/:refId/preview", (c) => {
+    const reference = new ReferenceRepository().find(c.req.param("refId"));
+    if (!reference) return c.json({ error: "Reference not found" }, 404);
+    if (!reference.resolved_pdf_path) {
+      return c.json({ error: "Reference PDF not available" }, 404);
+    }
+    const resolved = resolve(reference.resolved_pdf_path);
+    if (!isInsideReferences(resolved)) {
+      return c.json({ error: "Reference path is outside references folder" }, 403);
+    }
+    if (!existsSync(resolved)) {
+      return c.json({ error: "Reference PDF missing on disk" }, 404);
+    }
     return pdfResponse(resolved);
   });
 }

@@ -4,6 +4,64 @@ export interface AiClientOptions {
   model: string;
 }
 
+function stripJsonFence(input: string): string {
+  let text = input.trim();
+  // Strip leading ``` or ```json (or any language tag) fences
+  if (text.startsWith("```")) {
+    text = text.replace(/^```[a-zA-Z0-9_-]*\s*\n?/, "");
+    if (text.endsWith("```")) {
+      text = text.slice(0, -3);
+    }
+    text = text.trim();
+  }
+  return text;
+}
+
+function extractFirstJsonObject(input: string): string | null {
+  const start = input.indexOf("{");
+  if (start < 0) return null;
+  let depth = 0;
+  let inString = false;
+  let escape = false;
+  for (let i = start; i < input.length; i += 1) {
+    const ch = input[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (ch === "\\") {
+      escape = true;
+      continue;
+    }
+    if (ch === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (ch === "{") depth += 1;
+    else if (ch === "}") {
+      depth -= 1;
+      if (depth === 0) return input.slice(start, i + 1);
+    }
+  }
+  return null;
+}
+
+export function parseJsonLoose(raw: string): unknown {
+  const stripped = stripJsonFence(raw);
+  try {
+    return JSON.parse(stripped);
+  } catch {
+    const candidate = extractFirstJsonObject(stripped);
+    if (candidate) {
+      return JSON.parse(candidate);
+    }
+    throw new Error(
+      `AI provider returned non-JSON content: ${stripped.slice(0, 200)}`,
+    );
+  }
+}
+
 export class AiClient {
   constructor(private readonly options: AiClientOptions) {}
 
@@ -51,7 +109,8 @@ export class AiClient {
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
     if (!content) throw new Error("AI provider returned empty content");
-    return typeof content === "string" ? JSON.parse(content) : content;
+    if (typeof content !== "string") return content;
+    return parseJsonLoose(content);
   }
 
   async testConnection() {

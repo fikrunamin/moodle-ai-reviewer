@@ -13,6 +13,7 @@ export async function initRuntime() {
     ensureDirectory(paths.downloads),
     ensureDirectory(paths.extracted),
     ensureDirectory(paths.rubrics),
+    ensureDirectory(paths.references),
     ensureDirectory(paths.sessions),
     ensureDirectory(paths.logs),
   ]);

@@ -108,4 +108,69 @@ CREATE TABLE IF NOT EXISTS ai_assessment_scores (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (assessment_id) REFERENCES ai_assessments(id)
 );
+
+CREATE TABLE IF NOT EXISTS pdf_summaries (
+  id TEXT PRIMARY KEY,
+  file_id TEXT NOT NULL UNIQUE,
+  summary TEXT NOT NULL,
+  bullet_points TEXT,
+  language TEXT,
+  status TEXT NOT NULL DEFAULT 'completed',
+  error TEXT,
+  raw_json TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (file_id) REFERENCES moodle_submission_files(id)
+);
+CREATE INDEX IF NOT EXISTS idx_pdf_summaries_file ON pdf_summaries(file_id);
+
+CREATE TABLE IF NOT EXISTS extracted_links (
+  id TEXT PRIMARY KEY,
+  submission_id TEXT NOT NULL,
+  file_id TEXT,
+  url TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  youtube_video_id TEXT,
+  youtube_title TEXT,
+  youtube_author TEXT,
+  youtube_thumbnail_url TEXT,
+  oembed_status TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (submission_id) REFERENCES moodle_submissions(id),
+  FOREIGN KEY (file_id) REFERENCES moodle_submission_files(id)
+);
+CREATE INDEX IF NOT EXISTS idx_extracted_links_submission ON extracted_links(submission_id);
+
+CREATE TABLE IF NOT EXISTS extracted_references (
+  id TEXT PRIMARY KEY,
+  submission_id TEXT NOT NULL,
+  raw_text TEXT NOT NULL,
+  authors TEXT,
+  year INTEGER,
+  title TEXT,
+  source TEXT,
+  doi TEXT,
+  url TEXT,
+  arxiv_id TEXT,
+  parse_status TEXT NOT NULL DEFAULT 'parsed',
+  resolve_status TEXT NOT NULL DEFAULT 'pending',
+  resolve_source TEXT,
+  resolved_pdf_path TEXT,
+  resolved_pdf_url TEXT,
+  resolved_metadata_json TEXT,
+  resolve_error TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (submission_id) REFERENCES moodle_submissions(id)
+);
+CREATE INDEX IF NOT EXISTS idx_extracted_references_submission ON extracted_references(submission_id);
+
+CREATE TABLE IF NOT EXISTS reference_resolutions (
+  cache_key TEXT PRIMARY KEY,
+  source TEXT NOT NULL,
+  pdf_path TEXT,
+  pdf_url TEXT,
+  metadata_json TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
 `;

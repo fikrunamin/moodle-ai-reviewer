@@ -9,6 +9,7 @@ export const paths = {
   downloads: join(root, "data", "downloads"),
   extracted: join(root, "data", "extracted"),
   rubrics: join(root, "data", "rubrics"),
+  references: join(root, "data", "references"),
   updates: join(root, "data", "updates"),
   sessions: join(root, "data", "sessions"),
   logs: join(root, "data", "logs"),

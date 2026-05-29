@@ -2,6 +2,9 @@ import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "../../api/client";
 import { CopyFeedbackBox } from "./CopyFeedbackBox";
 import { RubricScore } from "./RubricScore";
+import { PdfFileCard } from "./pdf/PdfFileCard";
+import { LinksSection } from "./links/LinksSection";
+import { ReferencesSection } from "./references/ReferencesSection";
 
 interface Assessment {
   summary: string;
@@ -25,7 +28,7 @@ interface Detail {
     rubric_ai_json: string | null;
     rubric_extracted_text: string | null;
   };
-  submission: { submission_text: string | null; extracted_text: string | null } | null;
+  submission: { id?: string; submission_text: string | null; extracted_text: string | null } | null;
   files: Array<{ id: string; filename: string; file_path: string; extracted_text_path: string | null }>;
   posts: Array<{ content: string; reply_to: string | null }>;
 }
@@ -53,6 +56,8 @@ export function AssessmentDetailPanel({ studentId, activityType }: { studentId: 
   useEffect(() => {
     refresh();
   }, [studentId]);
+
+  const submissionId = detail?.submission?.id ?? null;
 
   async function generate() {
     if (!studentId) return;
@@ -116,19 +121,9 @@ export function AssessmentDetailPanel({ studentId, activityType }: { studentId: 
           <div className="win-inset p-2">
             <p className="font-bold">Preview file/PDF</p>
             {detail?.files.length ? (
-              <div className="grid gap-2">
+              <div className="grid gap-3">
                 {detail.files.map((file) => (
-                  <div key={file.file_path} className="grid gap-2">
-                    <p className="text-sm font-medium">{file.filename}</p>
-                    <iframe
-                      className="win-inset h-80 w-full"
-                      title={file.filename}
-                      src={`/api/files/${encodeURIComponent(file.id)}/preview`}
-                    />
-                    <a className="win-button w-fit px-2 py-1" href={`/api/files/${encodeURIComponent(file.id)}/preview`} target="_blank" rel="noreferrer">
-                      🔎 Open PDF
-                    </a>
-                  </div>
+                  <PdfFileCard key={file.id} fileId={file.id} filename={file.filename} />
                 ))}
               </div>
             ) : (
@@ -139,6 +134,16 @@ export function AssessmentDetailPanel({ studentId, activityType }: { studentId: 
             <p className="font-bold">Extracted text</p>
             <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-xs leading-5">{detail?.submission?.extracted_text || detail?.submission?.submission_text || "Belum ada teks submission."}</pre>
           </div>
+          {submissionId ? (
+            <div className="win-inset p-2">
+              <LinksSection submissionId={submissionId} />
+            </div>
+          ) : null}
+          {submissionId ? (
+            <div className="win-inset p-2">
+              <ReferencesSection submissionId={submissionId} />
+            </div>
+          ) : null}
         </section>
       ) : (
         <section className="grid gap-3">

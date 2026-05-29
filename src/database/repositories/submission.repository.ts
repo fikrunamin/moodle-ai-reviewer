@@ -21,6 +21,14 @@ export class SubmissionRepository {
       .get(studentId) as MoodleSubmission | null;
   }
 
+  find(submissionId: string) {
+    return (
+      (getDb()
+        .query("SELECT * FROM moodle_submissions WHERE id = ?")
+        .get(submissionId) as MoodleSubmission | null) ?? null
+    );
+  }
+
   listFiles(submissionId: string) {
     return getDb()
       .query("SELECT * FROM moodle_submission_files WHERE submission_id = ? ORDER BY created_at ASC")

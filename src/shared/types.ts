@@ -104,3 +104,70 @@ export interface AiAssessment {
   raw_json: unknown;
   created_at: string;
 }
+
+export type PdfSummaryStatus = "pending" | "processing" | "completed" | "failed";
+
+export interface PdfSummary {
+  id: string;
+  file_id: string;
+  summary: string;
+  bullet_points: string | null;
+  language: string | null;
+  status: PdfSummaryStatus;
+  error: string | null;
+  raw_json: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ExtractedLinkKind = "youtube" | "doi" | "arxiv" | "generic";
+export type OembedStatus = "ok" | "failed" | "skipped";
+
+export interface ExtractedLink {
+  id: string;
+  submission_id: string;
+  file_id: string | null;
+  url: string;
+  kind: ExtractedLinkKind;
+  youtube_video_id: string | null;
+  youtube_title: string | null;
+  youtube_author: string | null;
+  youtube_thumbnail_url: string | null;
+  oembed_status: OembedStatus | null;
+  created_at: string;
+}
+
+export type ReferenceParseStatus = "parsed" | "failed";
+export type ReferenceResolveStatus = "pending" | "resolving" | "found" | "not_found" | "failed";
+export type ReferenceResolveSource = "crossref" | "unpaywall" | "arxiv" | "cache" | "none";
+
+export interface ExtractedReference {
+  id: string;
+  submission_id: string;
+  raw_text: string;
+  authors: string | null;
+  year: number | null;
+  title: string | null;
+  source: string | null;
+  doi: string | null;
+  url: string | null;
+  arxiv_id: string | null;
+  parse_status: ReferenceParseStatus;
+  resolve_status: ReferenceResolveStatus;
+  resolve_source: ReferenceResolveSource | null;
+  resolved_pdf_path: string | null;
+  resolved_pdf_url: string | null;
+  resolved_metadata_json: string | null;
+  resolve_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReferenceResolution {
+  cache_key: string;
+  source: ReferenceResolveSource;
+  pdf_path: string | null;
+  pdf_url: string | null;
+  metadata_json: string;
+  created_at: string;
+}

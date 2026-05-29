@@ -46,3 +46,48 @@ export function buildDiscussionPrompt(input: {
     `Jumlah interaksi: ${input.interactionCount}`,
   ].join("\n\n");
 }
+
+export function buildPdfSummaryPrompt(input: {
+  filename?: string | null;
+  courseContext?: string | null;
+  instruction?: string | null;
+  extractedText: string;
+  truncated: boolean;
+}) {
+  return [
+    "Anda adalah asisten dosen yang membantu meringkas isi dokumen PDF mahasiswa.",
+    "Tujuan ringkasan: membantu dosen memahami inti dokumen dengan cepat tanpa harus membaca penuh.",
+    "Jangan memberi nilai. Jangan membuat keputusan akademik. Jangan menyebut AI.",
+    "Tulis ringkasan dalam Bahasa Indonesia akademik yang netral dan padat.",
+    "Buat JSON valid tanpa markdown.",
+    'Schema: {"language":"id|en","summary":"string ringkas 4-6 kalimat","bullet_points":["poin 1","poin 2","..."]}',
+    "bullet_points berisi 4-8 poin penting (tema, metode, temuan, struktur, atau argumen utama).",
+    `Nama file: ${input.filename ?? "tidak diketahui"}`,
+    `Konteks mata kuliah: ${input.courseContext ?? ""}`,
+    `Instruksi tugas: ${input.instruction ?? ""}`,
+    input.truncated
+      ? "Catatan: dokumen dipotong karena terlalu panjang, fokus pada bagian yang tersedia."
+      : "",
+    `Isi dokumen:\n${input.extractedText}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+export function buildReferenceParserPrompt(input: { rawText: string; truncated: boolean }) {
+  return [
+    "Anda adalah asisten dosen yang mengekstrak daftar referensi/sitasi dari teks PDF mahasiswa.",
+    "Cari bagian Daftar Pustaka, References, Bibliography, atau pola sitasi akademik (APA, IEEE, Vancouver, MLA).",
+    "Jangan mengarang referensi. Hanya ekstrak yang benar-benar tertulis di teks.",
+    "Buat JSON valid tanpa markdown.",
+    'Schema: {"references":[{"raw_text":"string asli citation","authors":["nama lengkap penulis","..."],"year":2023,"title":"judul artikel/buku","source":"jurnal/penerbit/conference","doi":"10.xxxx/yyyy atau null","url":"https://... atau null","arxiv_id":"2301.xxxxx atau null"}]}',
+    "Jika tidak ada bagian referensi sama sekali, kembalikan {\"references\":[]}.",
+    "Jangan masukkan in-text citation seperti (Smith, 2020). Hanya entry penuh dari daftar pustaka.",
+    input.truncated
+      ? "Catatan: teks dipotong, fokus mengekstrak referensi yang utuh saja."
+      : "",
+    `Teks dokumen:\n${input.rawText}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
