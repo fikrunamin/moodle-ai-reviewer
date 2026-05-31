@@ -15,7 +15,20 @@ export function registerStudentRoutes(app: Hono) {
                   FROM moodle_submissions sub
                   JOIN extracted_links link ON link.submission_id = sub.id
                   WHERE sub.student_id = s.id AND link.kind = 'youtube'
-                ) AS has_youtube_link
+                ) AS has_youtube_link,
+                (
+                  EXISTS(
+                    SELECT 1
+                    FROM moodle_submissions sub
+                    JOIN extracted_references ref ON ref.submission_id = sub.id
+                    WHERE sub.student_id = s.id
+                  )
+                  OR EXISTS(
+                    SELECT 1
+                    FROM forum_references ref
+                    WHERE ref.student_id = s.id
+                  )
+                ) AS has_reference
          FROM moodle_students s
          WHERE s.activity_id = ?
          ORDER BY s.student_name ASC`,

@@ -78,14 +78,67 @@ CREATE TABLE IF NOT EXISTS moodle_discussion_posts (
   id TEXT PRIMARY KEY,
   activity_id TEXT NOT NULL,
   student_id TEXT,
+  moodle_post_id TEXT,
+  parent_moodle_post_id TEXT,
+  subject TEXT,
   content TEXT NOT NULL,
   reply_to TEXT,
   author_name TEXT NOT NULL,
+  author_role TEXT,
+  author_user_id TEXT,
+  author_profile_url TEXT,
   posted_at TEXT,
+  has_rating_menu INTEGER NOT NULL DEFAULT 0,
+  rating_max REAL,
+  is_first_post INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (activity_id) REFERENCES moodle_activities(id),
   FOREIGN KEY (student_id) REFERENCES moodle_students(id)
 );
+CREATE INDEX IF NOT EXISTS idx_discussion_posts_student ON moodle_discussion_posts(student_id);
+
+CREATE TABLE IF NOT EXISTS forum_references (
+  id TEXT PRIMARY KEY,
+  activity_id TEXT NOT NULL,
+  student_id TEXT NOT NULL,
+  post_id TEXT,
+  raw_text TEXT NOT NULL,
+  authors TEXT,
+  year INTEGER,
+  title TEXT,
+  source TEXT,
+  doi TEXT,
+  url TEXT,
+  arxiv_id TEXT,
+  parse_status TEXT NOT NULL DEFAULT 'parsed',
+  resolve_status TEXT NOT NULL DEFAULT 'pending',
+  resolve_source TEXT,
+  resolved_pdf_path TEXT,
+  resolved_pdf_url TEXT,
+  resolved_metadata_json TEXT,
+  resolve_error TEXT,
+  relevance_status TEXT NOT NULL DEFAULT 'pending',
+  relevance_json TEXT,
+  relevance_error TEXT,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (activity_id) REFERENCES moodle_activities(id),
+  FOREIGN KEY (student_id) REFERENCES moodle_students(id),
+  FOREIGN KEY (post_id) REFERENCES moodle_discussion_posts(id)
+);
+CREATE INDEX IF NOT EXISTS idx_forum_references_student ON forum_references(student_id);
+
+CREATE TABLE IF NOT EXISTS forum_reply_suggestions (
+  id TEXT PRIMARY KEY,
+  activity_id TEXT NOT NULL,
+  student_id TEXT NOT NULL,
+  suggestion TEXT NOT NULL,
+  raw_json TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (activity_id) REFERENCES moodle_activities(id),
+  FOREIGN KEY (student_id) REFERENCES moodle_students(id)
+);
+CREATE INDEX IF NOT EXISTS idx_forum_reply_suggestions_student ON forum_reply_suggestions(student_id);
 
 CREATE TABLE IF NOT EXISTS ai_assessments (
   id TEXT PRIMARY KEY,

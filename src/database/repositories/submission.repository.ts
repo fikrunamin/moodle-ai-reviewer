@@ -6,6 +6,8 @@ export class SubmissionRepository {
   clearMoodleDataForActivity(activityId: string) {
     const db = getDb();
     const tx = db.transaction(() => {
+      db.query("DELETE FROM forum_references WHERE activity_id = ?").run(activityId);
+      db.query("DELETE FROM forum_reply_suggestions WHERE activity_id = ?").run(activityId);
       db.query(
         `DELETE FROM pdf_summaries WHERE file_id IN (
           SELECT f.id FROM moodle_submission_files f

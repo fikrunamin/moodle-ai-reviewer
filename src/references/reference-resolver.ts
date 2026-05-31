@@ -1,5 +1,6 @@
 import { lookupArxivById, lookupArxivByQuery } from "./arxiv.client";
 import { lookupCrossrefByDoi, lookupCrossrefByQuery } from "./crossref.client";
+import { searchGoogleReference } from "./google-search.client";
 import { lookupUnpaywall } from "./unpaywall.client";
 import { downloadReferencePdf } from "./reference-downloader";
 import { ReferenceResolutionCache } from "../database/repositories/reference.repository";
@@ -69,6 +70,14 @@ function buildScholarSearchUrl(reference: ExtractedReference) {
   return `https://scholar.google.com/scholar?q=${encodeURIComponent(query)}`;
 }
 
+function buildGoogleQuery(reference: ExtractedReference) {
+  const bundle = metadataAsBundle(reference);
+  const structured = [bundle.title, bundle.year, ...(bundle.authors ?? []), bundle.source]
+    .filter(Boolean)
+    .join(" ");
+  return structured.trim() || reference.raw_text;
+}
+
 export async function resolveReference(reference: ExtractedReference): Promise<ResolveOutcome> {
   const cache = new ReferenceResolutionCache();
   const cacheKey = buildCacheKey(reference);
@@ -84,27 +93,32 @@ export async function resolveReference(reference: ExtractedReference): Promise<R
 
   const bundle = metadataAsBundle(reference);
 
-  // Step 1: Crossref
-  let crossref = reference.doi ? await lookupCrossrefByDoi(reference.doi) : null;
+  // Step 1: Google web search (best effort) to discover DOI/PDF/landing pages.
+  const google = await searchGoogleReference(buildGoogleQuery(reference));
+
+  // Step 2: Crossref
+  const googleDoi = google?.doi ?? null;
+  let crossref = reference.doi || googleDoi ? await lookupCrossrefByDoi(reference.doi ?? googleDoi!) : null;
   if (!crossref) crossref = await lookupCrossrefByQuery({
     title: bundle.title,
     authors: bundle.authors,
     year: bundle.year,
   });
 
-  const doi = crossref?.doi ?? reference.doi ?? null;
+  const doi = crossref?.doi ?? reference.doi ?? googleDoi ?? null;
 
-  // Step 2: Unpaywall (only if we have a DOI)
+  // Step 3: Unpaywall (only if we have a DOI)
   let unpaywall = doi ? await lookupUnpaywall(doi) : null;
 
-  // Step 3: arXiv
+  // Step 4: arXiv
   let arxiv = reference.arxiv_id ? await lookupArxivById(reference.arxiv_id) : null;
   if (!arxiv && !unpaywall?.pdfUrl) {
     arxiv = await lookupArxivByQuery({ title: bundle.title, authors: bundle.authors });
   }
 
-  // Try downloads in order: Unpaywall → Crossref direct PDF → arXiv
+  // Try downloads in order: Google direct PDF → Unpaywall → Crossref direct PDF → arXiv
   const candidates: Array<{ source: ReferenceResolveSource; url: string }> = [];
+  for (const url of google?.pdfUrls ?? []) candidates.push({ source: "google", url });
   if (unpaywall?.pdfUrl) candidates.push({ source: "unpaywall", url: unpaywall.pdfUrl });
   if (crossref?.pdfUrl) candidates.push({ source: "crossref", url: crossref.pdfUrl });
   if (arxiv?.pdfUrl) candidates.push({ source: "arxiv", url: arxiv.pdfUrl });
@@ -114,12 +128,15 @@ export async function resolveReference(reference: ExtractedReference): Promise<R
     const download = await downloadReferencePdf(candidate.url);
     if (download.ok && download.pdfPath) {
       const metadata = {
+        google,
         crossref,
         unpaywall,
         arxiv,
         scholarUrl: buildScholarSearchUrl(reference),
         downloadedFrom: candidate.url,
         landingUrl:
+          google?.landingUrls[0] ??
+          google?.searchUrl ??
           unpaywall?.landingUrl ??
           crossref?.landingUrl ??
           arxiv?.landingUrl ??
@@ -144,12 +161,13 @@ export async function resolveReference(reference: ExtractedReference): Promise<R
 
   // No PDF found, but we may have metadata
   const fallbackMetadata = {
+    google,
     crossref,
     unpaywall,
     arxiv,
     scholarUrl: buildScholarSearchUrl(reference),
     landingUrl:
-      unpaywall?.landingUrl ?? crossref?.landingUrl ?? arxiv?.landingUrl ?? reference.url ?? null,
+      google?.landingUrls[0] ?? google?.searchUrl ?? unpaywall?.landingUrl ?? crossref?.landingUrl ?? arxiv?.landingUrl ?? reference.url ?? null,
     lastError,
   };
   cache.set({

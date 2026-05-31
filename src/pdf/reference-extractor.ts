@@ -22,6 +22,8 @@ const NEXT_SECTION_HEADERS = [
 const DOI_REGEX = /\b(10\.\d{4,9}\/[\w\-\.\;\(\)\/:%#]+)\b/i;
 const ARXIV_REGEX = /\barxiv:\s*(\d{4}\.\d{4,5})\b/i;
 const ARXIV_URL_REGEX = /arxiv\.org\/(?:abs|pdf)\/(\d{4}\.\d{4,5})/i;
+const URL_REGEX = /\bhttps?:\/\/[^\s)]+/i;
+const YEAR_REGEX = /\b(19|20)\d{2}\b/;
 
 function findReferenceBlock(text: string): { block: string; truncated: boolean } {
   const lower = text.toLowerCase();
@@ -81,6 +83,30 @@ function dedupeReferences(refs: ParsedReferenceInput[]): ParsedReferenceInput[] 
   return result;
 }
 
+function parseReferencesHeuristic(block: string): ParsedReferenceInput[] {
+  return block
+    .split(/\n+/)
+    .map((line) => line.replace(/^[-*\d.\s]+/, "").trim())
+    .filter((line) => line.length >= 20)
+    .filter((line) => DOI_REGEX.test(line) || ARXIV_REGEX.test(line) || ARXIV_URL_REGEX.test(line) || URL_REGEX.test(line) || YEAR_REGEX.test(line))
+    .map((line) => {
+      const doi = line.match(DOI_REGEX)?.[1] ?? null;
+      const arxivId = line.match(ARXIV_REGEX)?.[1] ?? line.match(ARXIV_URL_REGEX)?.[1] ?? null;
+      const url = line.match(URL_REGEX)?.[0]?.replace(/[.,;]+$/, "") ?? null;
+      const year = Number(line.match(YEAR_REGEX)?.[0] ?? 0) || null;
+      return ensureDoiAndArxiv({
+        rawText: line,
+        authors: null,
+        year,
+        title: null,
+        source: null,
+        doi,
+        url,
+        arxivId,
+      });
+    });
+}
+
 export interface ParsedReferences {
   references: ParsedReferenceInput[];
   block: string;
@@ -129,5 +155,6 @@ export async function parseReferencesFromText(text: string): Promise<ParsedRefer
     : [];
 
   const enriched = fromAi.map(ensureDoiAndArxiv);
-  return { references: dedupeReferences(enriched), block };
+  const fallback = enriched.length ? [] : parseReferencesHeuristic(block);
+  return { references: dedupeReferences([...enriched, ...fallback]), block };
 }

@@ -6,6 +6,7 @@ interface Student {
   submission_status?: string | null;
   interaction_count?: number;
   has_youtube_link?: number | boolean;
+  has_reference?: number | boolean;
 }
 
 interface Props {
@@ -26,6 +27,7 @@ const AI_TONE: Record<string, string> = {
 export function StudentItem({ student, active, checked, onCheckedChange, onClick }: Props) {
   const tone = AI_TONE[student.ai_status] ?? "text-muted";
   const hasYoutube = Boolean(student.has_youtube_link);
+  const hasReference = Boolean(student.has_reference);
   return (
     <div
       className={`win-inset grid grid-cols-[auto_1fr_auto] items-center gap-2 px-2 py-1.5 transition-colors ${
@@ -45,6 +47,15 @@ export function StudentItem({ student, active, checked, onCheckedChange, onClick
           {hasYoutube ? (
             <span className="shrink-0 rounded-full border border-red-500/40 bg-red-500/15 px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide text-red-300">
               YouTube
+            </span>
+          ) : null}
+          {hasReference ? (
+            <span
+              className="shrink-0 rounded-full border border-emerald-500/35 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] leading-none"
+              title="Memiliki referensi terdeteksi"
+              aria-label="Memiliki referensi terdeteksi"
+            >
+              📚
             </span>
           ) : null}
         </span>

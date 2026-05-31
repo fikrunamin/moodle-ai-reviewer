@@ -5,6 +5,7 @@ import { RubricScore } from "./RubricScore";
 import { PdfFileCard } from "./pdf/PdfFileCard";
 import { LinksSection } from "./links/LinksSection";
 import { ReferencesSection } from "./references/ReferencesSection";
+import { ForumThreadPanel } from "./forum/ForumThreadPanel";
 
 interface Assessment {
   summary: string;
@@ -413,27 +414,7 @@ export function AssessmentDetailPanel({
             {submissionId ? <ReferencesSection submissionId={submissionId} /> : null}
           </section>
         ) : (
-          <section className="grid gap-3">
-            <h3 className="win-section-title">Discussion</h3>
-            <Field label="Thread title">{detail?.activity.title ?? "-"}</Field>
-            <Field label="Prompt diskusi">{detail?.activity.prompt ?? "-"}</Field>
-            <div className="grid gap-1">
-              <span className="win-section-title">
-                Komentar mahasiswa · {detail?.student.interaction_count ?? 0} interaksi
-              </span>
-              <div className="grid max-h-60 gap-2 overflow-auto">
-                {detail?.posts.length ? (
-                  detail.posts.map((post, index) => (
-                    <p className="win-inset px-3 py-2 text-[12.5px] leading-relaxed" key={index}>
-                      {post.content}
-                    </p>
-                  ))
-                ) : (
-                  <p className="win-status text-muted">Belum ada komentar.</p>
-                )}
-              </div>
-            </div>
-          </section>
+          <ForumThreadPanel studentId={studentId} onReviewGenerated={refresh} />
         )}
 
         <hr />

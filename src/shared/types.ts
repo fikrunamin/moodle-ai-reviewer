@@ -74,10 +74,55 @@ export interface MoodleDiscussionPost {
   id: string;
   activity_id: string;
   student_id: string | null;
+  moodle_post_id: string | null;
+  parent_moodle_post_id: string | null;
+  subject: string | null;
   content: string;
   reply_to: string | null;
   author_name: string;
+  author_role: "student" | "tutor" | "system" | "unknown" | null;
+  author_user_id: string | null;
+  author_profile_url: string | null;
   posted_at: string | null;
+  has_rating_menu: number;
+  rating_max: number | null;
+  is_first_post: number;
+  created_at: string;
+}
+
+export interface ForumReference {
+  id: string;
+  activity_id: string;
+  student_id: string;
+  post_id: string | null;
+  raw_text: string;
+  authors: string | null;
+  year: number | null;
+  title: string | null;
+  source: string | null;
+  doi: string | null;
+  url: string | null;
+  arxiv_id: string | null;
+  parse_status: ReferenceParseStatus;
+  resolve_status: ReferenceResolveStatus;
+  resolve_source: ReferenceResolveSource | null;
+  resolved_pdf_path: string | null;
+  resolved_pdf_url: string | null;
+  resolved_metadata_json: string | null;
+  resolve_error: string | null;
+  relevance_status: "pending" | "analyzing" | "completed" | "failed";
+  relevance_json: string | null;
+  relevance_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ForumReplySuggestion {
+  id: string;
+  activity_id: string;
+  student_id: string;
+  suggestion: string;
+  raw_json: string;
   created_at: string;
 }
 
@@ -149,7 +194,7 @@ export interface ExtractedLink {
 
 export type ReferenceParseStatus = "parsed" | "failed";
 export type ReferenceResolveStatus = "pending" | "resolving" | "found" | "not_found" | "failed";
-export type ReferenceResolveSource = "crossref" | "unpaywall" | "arxiv" | "cache" | "none";
+export type ReferenceResolveSource = "google" | "crossref" | "unpaywall" | "arxiv" | "cache" | "none";
 
 export interface ExtractedReference {
   id: string;

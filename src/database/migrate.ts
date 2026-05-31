@@ -26,4 +26,14 @@ export async function migrate() {
   ensureColumn("moodle_students", "interaction_count", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("ai_assessments", "is_obsolete", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("moodle_submission_files", "preview_pdf_path", "TEXT");
+  ensureColumn("moodle_discussion_posts", "moodle_post_id", "TEXT");
+  ensureColumn("moodle_discussion_posts", "parent_moodle_post_id", "TEXT");
+  ensureColumn("moodle_discussion_posts", "subject", "TEXT");
+  ensureColumn("moodle_discussion_posts", "author_role", "TEXT");
+  ensureColumn("moodle_discussion_posts", "author_user_id", "TEXT");
+  ensureColumn("moodle_discussion_posts", "author_profile_url", "TEXT");
+  ensureColumn("moodle_discussion_posts", "has_rating_menu", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn("moodle_discussion_posts", "rating_max", "REAL");
+  ensureColumn("moodle_discussion_posts", "is_first_post", "INTEGER NOT NULL DEFAULT 0");
+  getDb().exec("CREATE INDEX IF NOT EXISTS idx_discussion_posts_moodle_post ON moodle_discussion_posts(moodle_post_id)");
 }

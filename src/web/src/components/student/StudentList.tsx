@@ -12,6 +12,7 @@ interface Student {
   submission_status: string | null;
   interaction_count: number;
   has_youtube_link?: number | boolean;
+  has_reference?: number | boolean;
 }
 
 interface Props {

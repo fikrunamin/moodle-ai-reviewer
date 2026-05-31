@@ -65,22 +65,72 @@ export function buildDiscussionPrompt(input: {
   prompt: string;
   posts: string;
   interactionCount: number;
+  tutorReplies?: string | null;
+  ratingMax?: number | null;
 }) {
   const rubricGuide =
     input.rubricGuide ||
-    "Rubrik default: Kualitas Argumen 25, Relevansi 25, Kedalaman Analisis 20, Jumlah Interaksi 20, Etika Komunikasi 10.";
+    "Rubrik forum default: Kesesuaian jawaban 20, Kedalaman analisis 25, Keterkaitan teori/konsep 20, Relevansi contoh/argumentasi 15, Kualitas referensi 10, Etika dan kejelasan komunikasi 10.";
+  const ratingMax = input.ratingMax ?? 100;
 
   return [
     "Anda adalah asisten dosen untuk menilai kualitas diskusi mahasiswa.",
     "AI hanya memberi rekomendasi, bukan nilai final.",
+    `Skor rekomendasi menggunakan skala Moodle 0-${ratingMax}. Tutor tetap memilih nilai final secara manual di Moodle.`,
     "Buat draft review akademik dalam JSON valid tanpa markdown.",
-    'Schema: {"summary":"string","recommended_score":0,"scores":{"argument_quality":0,"relevance":0,"analysis_depth":0,"interaction_quantity":0,"communication_ethics":0},"interaction_count":0,"feedback":"string","manual_review_required":false,"manual_review_reason":null}',
+    'Schema: {"summary":"string","recommended_score":0,"scores":{"instruction_alignment":0,"analysis_depth":0,"conceptual_grounding":0,"argument_relevance":0,"reference_quality":0,"communication_ethics":0},"interaction_count":0,"feedback":"string","manual_review_required":false,"manual_review_reason":null}',
     `Rubrik dan format penilaian: ${rubricGuide}`,
     `Konteks mata kuliah: ${input.courseContext ?? ""}`,
-    `Prompt: ${input.prompt}`,
-    `Komentar: ${input.posts}`,
-    `Jumlah interaksi: ${input.interactionCount}`,
+    `Instruksi/study case forum: ${boundedText(input.prompt, Number(process.env.REVIEW_FORUM_PROMPT_MAX_CHARS ?? 6000), "Instruksi forum")}`,
+    `Jawaban dan follow-up mahasiswa: ${boundedText(input.posts, Number(process.env.REVIEW_FORUM_POSTS_MAX_CHARS ?? 18000), "Post mahasiswa")}`,
+    input.tutorReplies ? `Reply tutor sebagai konteks, bukan bahan yang dinilai: ${boundedText(input.tutorReplies, 8000, "Reply tutor")}` : "",
+    `Jumlah post mahasiswa dalam thread: ${input.interactionCount}`,
   ].join("\n\n");
+}
+
+export function buildForumReplySuggestionPrompt(input: {
+  courseContext?: string | null;
+  prompt: string;
+  studentPosts: string;
+  tutorReplies?: string | null;
+  assessmentSummary?: string | null;
+  referenceAnalysis?: string | null;
+}) {
+  return [
+    "Anda adalah tutor/dosen forum Moodle yang akan menulis balasan akademik kepada mahasiswa.",
+    "Buat saran reply copy-ready dalam Bahasa Indonesia. Jangan menyebut AI. Jangan mengirim atau mengubah apa pun di Moodle.",
+    "Nada: ramah, ringkas, spesifik, dan membimbing. Beri apresiasi, koreksi jika perlu, dan arahan perbaikan.",
+    "Buat JSON valid tanpa markdown.",
+    '{"suggestion":"string reply tutor siap copy","key_points":["poin singkat"],"needs_reference_note":false}',
+    `Konteks mata kuliah: ${input.courseContext ?? ""}`,
+    `Instruksi/study case forum: ${boundedText(input.prompt, 6000, "Instruksi forum")}`,
+    `Jawaban/follow-up mahasiswa: ${boundedText(input.studentPosts, 16000, "Post mahasiswa")}`,
+    input.tutorReplies ? `Reply tutor yang sudah ada: ${boundedText(input.tutorReplies, 6000, "Reply tutor")}` : "",
+    input.assessmentSummary ? `Hasil review AI sebelumnya: ${input.assessmentSummary}` : "",
+    input.referenceAnalysis ? `Analisis referensi: ${boundedText(input.referenceAnalysis, 8000, "Analisis referensi")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+export function buildForumReferenceRelevancePrompt(input: {
+  prompt: string;
+  studentPosts: string;
+  referenceRawText: string;
+  resolvedMetadata?: string | null;
+}) {
+  return [
+    "Anda membantu tutor mengecek apakah referensi yang dikutip mahasiswa relevan dengan jawaban diskusi.",
+    "Jangan mengarang metadata. Jika referensi tidak terlacak, nilai relevansi hanya dari teks sitasi yang tersedia.",
+    "Buat JSON valid tanpa markdown.",
+    '{"validity":"valid|unverified|invalid","relevance":"high|medium|low|none","supports_argument":true,"possible_random_citation":false,"analysis":"string ringkas untuk tutor"}',
+    `Instruksi/study case forum: ${boundedText(input.prompt, 5000, "Instruksi forum")}`,
+    `Jawaban/follow-up mahasiswa: ${boundedText(input.studentPosts, 14000, "Post mahasiswa")}`,
+    `Referensi yang dikutip: ${input.referenceRawText}`,
+    input.resolvedMetadata ? `Metadata hasil pencarian: ${boundedText(input.resolvedMetadata, 8000, "Metadata referensi")}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 export function buildPdfSummaryPrompt(input: {

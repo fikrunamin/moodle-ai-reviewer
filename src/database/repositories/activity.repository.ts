@@ -129,6 +129,8 @@ export class ActivityRepository {
          )`,
       ).run(...ids);
       db.query(`DELETE FROM moodle_submissions WHERE activity_id IN (${placeholders})`).run(...ids);
+      db.query(`DELETE FROM forum_references WHERE activity_id IN (${placeholders})`).run(...ids);
+      db.query(`DELETE FROM forum_reply_suggestions WHERE activity_id IN (${placeholders})`).run(...ids);
       db.query(`DELETE FROM moodle_discussion_posts WHERE activity_id IN (${placeholders})`).run(...ids);
       db.query(
         `DELETE FROM ai_assessment_scores WHERE assessment_id IN (

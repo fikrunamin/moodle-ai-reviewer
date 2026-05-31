@@ -78,6 +78,8 @@ export class StudentRepository {
          )`,
       ).run(...ids);
       db.query(`DELETE FROM moodle_submissions WHERE student_id IN (${placeholders})`).run(...ids);
+      db.query(`DELETE FROM forum_references WHERE student_id IN (${placeholders})`).run(...ids);
+      db.query(`DELETE FROM forum_reply_suggestions WHERE student_id IN (${placeholders})`).run(...ids);
       db.query(`DELETE FROM moodle_discussion_posts WHERE student_id IN (${placeholders})`).run(...ids);
       db.query(
         `DELETE FROM ai_assessment_scores WHERE assessment_id IN (

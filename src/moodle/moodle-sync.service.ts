@@ -1,6 +1,7 @@
 import { launchBrowser } from "../browser/puppeteer-client";
 import { ActivityRepository } from "../database/repositories/activity.repository";
 import { AssessmentRepository } from "../database/repositories/assessment.repository";
+import { ForumRepository } from "../database/repositories/forum.repository";
 import { StudentRepository } from "../database/repositories/student.repository";
 import { SubmissionRepository } from "../database/repositories/submission.repository";
 import { extractDocumentText } from "../pdf/document-extractor";
@@ -8,13 +9,11 @@ import { convertDocxToPdf } from "../pdf/docx-to-pdf";
 import { logger } from "../shared/logger";
 import { MoodleAssignmentScraper, type ScrapedAdvancedRubric } from "./moodle-assignment.scraper";
 import { MoodleAuthService } from "./moodle-auth.service";
-import { MoodleDiscussionScraper } from "./moodle-discussion.scraper";
+import { MoodleDiscussionScraper, type ScrapedDiscussionPost } from "./moodle-discussion.scraper";
 import { MoodleDownloadService } from "./moodle-download.service";
 import { extractPdfEnrichmentsJob } from "../jobs/extract-pdf-enrichments.job";
 import { analyzeInstructionFilesJob } from "../jobs/analyze-instruction-files.job";
 import { enrichmentQueue } from "../jobs/queues";
-import { getDb } from "../database/db";
-import { nanoid } from "nanoid";
 import type { Browser, Page } from "puppeteer-core";
 import type { MoodleActivity } from "../shared/types";
 
@@ -75,9 +74,43 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function ownerStudentPost(
+  post: ScrapedDiscussionPost,
+  byPostId: Map<string, ScrapedDiscussionPost>,
+  firstPostId: string | null,
+): ScrapedDiscussionPost | null {
+  if (post.isFirstPost || post.authorRole === "system") return null;
+  if (post.authorRole === "student") {
+    let owner = post;
+    let current = post;
+    const seen = new Set<string>();
+    while (current.parentMoodlePostId && !seen.has(current.parentMoodlePostId)) {
+      seen.add(current.parentMoodlePostId);
+      if (current.parentMoodlePostId === firstPostId) return owner;
+      const parent = byPostId.get(current.parentMoodlePostId);
+      if (!parent) break;
+      if (parent.authorRole === "student") owner = parent;
+      current = parent;
+    }
+    return owner;
+  }
+
+  let current: ScrapedDiscussionPost | undefined = post;
+  const seen = new Set<string>();
+  while (current?.parentMoodlePostId && !seen.has(current.parentMoodlePostId)) {
+    seen.add(current.parentMoodlePostId);
+    const parent = byPostId.get(current.parentMoodlePostId);
+    if (!parent) break;
+    if (parent.authorRole === "student") return ownerStudentPost(parent, byPostId, firstPostId) ?? parent;
+    current = parent;
+  }
+  return null;
+}
+
 export class MoodleSyncService {
   private readonly activities = new ActivityRepository();
   private readonly assessments = new AssessmentRepository();
+  private readonly forum = new ForumRepository();
   private readonly students = new StudentRepository();
   private readonly submissions = new SubmissionRepository();
   private readonly downloader = new MoodleDownloadService();
@@ -256,31 +289,63 @@ export class MoodleSyncService {
       } else {
         await page.goto(activity.url, { waitUntil: "networkidle2", timeout: 45_000 });
         const scraped = await new MoodleDiscussionScraper().scrape(page);
-        this.activities.updateScrapedContent(activityId, { title: scraped.title, prompt: scraped.prompt });
-        const db = getDb();
-        db.query("DELETE FROM moodle_discussion_posts WHERE activity_id = ?").run(activityId);
-
-        const grouped = new Map<string, typeof scraped.posts>();
-        for (const post of scraped.posts) {
-          const list = grouped.get(post.studentName) ?? [];
-          list.push(post);
-          grouped.set(post.studentName, list);
+        this.activities.updateScrapedContent(activityId, {
+          title: scraped.title,
+          prompt: scraped.prompt,
+          courseContext: scraped.courseContext,
+        });
+        this.forum.clearActivity(activityId);
+        const existingDiscussionStudents = this.students.listByActivity(activityId);
+        if (existingDiscussionStudents.length) {
+          this.students.deleteMany(existingDiscussionStudents.map((item) => item.id));
         }
 
-        for (const [studentName, posts] of grouped) {
+        const firstPost = scraped.posts.find((post) => post.isFirstPost) ?? null;
+        const byPostId = new Map(scraped.posts.map((post) => [post.moodlePostId, post]));
+        const ownerByPostId = new Map<string, ScrapedDiscussionPost>();
+        const postsByOwnerName = new Map<string, ScrapedDiscussionPost[]>();
+
+        for (const post of scraped.posts) {
+          const owner = ownerStudentPost(post, byPostId, firstPost?.moodlePostId ?? null);
+          if (!owner) continue;
+          ownerByPostId.set(post.moodlePostId, owner);
+          const list = postsByOwnerName.get(owner.studentName) ?? [];
+          list.push(post);
+          postsByOwnerName.set(owner.studentName, list);
+        }
+
+        const studentIdByOwnerName = new Map<string, string>();
+        for (const [studentName, posts] of postsByOwnerName) {
+          const studentPostCount = posts.filter((post) => post.authorRole === "student").length;
           const student = this.students.upsert({
             activityId,
             studentName,
-            submissionStatus: posts.length > 0 ? "posted" : "missing",
-            interactionCount: posts.length,
+            submissionStatus: studentPostCount > 0 ? "posted" : "missing",
+            interactionCount: studentPostCount,
           });
+          studentIdByOwnerName.set(studentName, student.id);
+        }
 
-          const insertPost = db.query(
-            "INSERT INTO moodle_discussion_posts (id, activity_id, student_id, content, reply_to, author_name, posted_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
-          );
-          for (const post of posts) {
-            insertPost.run(nanoid(), activityId, student.id, post.content, post.replyTo ?? null, post.studentName, post.postedAt ?? null);
-          }
+        for (const post of scraped.posts) {
+          const owner = ownerByPostId.get(post.moodlePostId);
+          const studentId = owner ? studentIdByOwnerName.get(owner.studentName) ?? null : null;
+          this.forum.addPost({
+            activityId,
+            studentId,
+            moodlePostId: post.moodlePostId,
+            parentMoodlePostId: post.parentMoodlePostId ?? null,
+            subject: post.subject ?? null,
+            content: post.content,
+            replyTo: post.replyTo ?? null,
+            authorName: post.studentName,
+            authorRole: post.authorRole,
+            authorUserId: post.authorUserId ?? null,
+            authorProfileUrl: post.authorProfileUrl ?? null,
+            postedAt: post.postedAt ?? null,
+            hasRatingMenu: post.hasRatingMenu,
+            ratingMax: post.ratingMax ?? scraped.ratingMax ?? null,
+            isFirstPost: post.isFirstPost,
+          });
         }
       }
 

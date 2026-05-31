@@ -54,6 +54,25 @@ function isTimeoutError(error: unknown) {
   );
 }
 
+function isTransientNetworkError(error: unknown) {
+  const code = typeof error === "object" && error ? String((error as { code?: unknown }).code ?? "") : "";
+  const message = error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return (
+    ["ECONNRESET", "EPIPE", "ETIMEDOUT", "UND_ERR_SOCKET"].includes(code) ||
+    message.includes("socket connection was closed") ||
+    message.includes("connection reset") ||
+    message.includes("fetch failed")
+  );
+}
+
+function isRetriableStatus(status: number) {
+  return status === 429 || status === 500 || status === 502 || status === 503 || status === 504;
+}
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export function parseJsonLoose(raw: string): unknown {
   const stripped = stripJsonFence(raw);
   try {
@@ -96,30 +115,40 @@ export class AiClient {
 
   async completeJson(prompt: string, options: { timeoutMs?: number } = {}) {
     const timeoutMs = options.timeoutMs ?? this.requestTimeoutMs();
-    let response: Response;
-    try {
-      response = await this.fetch(`${this.options.baseUrl}/chat/completions`, {
-        method: "POST",
-        signal: AbortSignal.timeout(timeoutMs),
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.options.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: this.options.model,
-          response_format: { type: "json_object" },
-          messages: [{ role: "user", content: prompt }],
-        }),
-      });
-    } catch (error) {
-      if (isTimeoutError(error)) {
-        throw new Error(
-          `AI request timed out after ${Math.round(timeoutMs / 1000)} seconds. Coba generate ulang atau naikkan REVIEW_AI_TIMEOUT_MS.`,
-        );
+    const retries = Math.max(0, Number(process.env.AI_REQUEST_RETRIES ?? 2));
+    const body = JSON.stringify({
+      model: this.options.model,
+      response_format: { type: "json_object" },
+      messages: [{ role: "user", content: prompt }],
+    });
+
+    let response: Response | null = null;
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+      try {
+        response = await this.fetch(`${this.options.baseUrl}/chat/completions`, {
+          method: "POST",
+          signal: AbortSignal.timeout(timeoutMs),
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.options.apiKey}`,
+          },
+          body,
+        });
+        if (response.ok || !isRetriableStatus(response.status) || attempt === retries) break;
+      } catch (error) {
+        if (isTimeoutError(error)) {
+          throw new Error(
+            `AI request timed out after ${Math.round(timeoutMs / 1000)} seconds. Coba generate ulang atau naikkan REVIEW_AI_TIMEOUT_MS.`,
+          );
+        }
+        if (!isTransientNetworkError(error) || attempt === retries) {
+          throw error;
+        }
       }
-      throw error;
+      await delay(750 * (attempt + 1));
     }
 
+    if (!response) throw new Error("AI request failed before receiving a response");
     if (!response.ok) {
       throw await this.providerError(response, "AI request failed");
     }
