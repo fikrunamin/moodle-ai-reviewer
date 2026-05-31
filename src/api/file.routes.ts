@@ -20,11 +20,21 @@ function isInsideReferences(filePath: string) {
   return isInsidePath(filePath, paths.references);
 }
 
+function fileContentType(filePath: string) {
+  const lower = filePath.toLowerCase();
+  if (lower.endsWith(".docx"))
+    return "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+  if (lower.endsWith(".doc")) return "application/msword";
+  return "application/pdf";
+}
+
 function pdfResponse(filePath: string) {
+  const contentType = fileContentType(filePath);
+  const disposition = contentType === "application/pdf" ? "inline" : "attachment";
   return new Response(Bun.file(filePath), {
     headers: {
-      "Content-Type": "application/pdf",
-      "Content-Disposition": "inline",
+      "Content-Type": contentType,
+      "Content-Disposition": disposition,
       "Cache-Control": "private, max-age=3600",
     },
   });
@@ -34,7 +44,10 @@ export function registerFileRoutes(app: Hono) {
   app.get("/api/files/:fileId/preview", (c) => {
     const file = new SubmissionRepository().findFile(c.req.param("fileId"));
     if (!file) return c.json({ error: "File not found" }, 404);
-    const resolved = resolve(file.file_path);
+
+    // Prefer a rendered preview PDF (e.g. converted from DOCX) when available.
+    const target = file.preview_pdf_path || file.file_path;
+    const resolved = resolve(target);
 
     if (!isInsideDownloads(resolved)) {
       return c.json({ error: "File path is outside downloads folder" }, 403);

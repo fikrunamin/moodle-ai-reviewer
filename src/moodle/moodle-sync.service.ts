@@ -3,13 +3,15 @@ import { ActivityRepository } from "../database/repositories/activity.repository
 import { AssessmentRepository } from "../database/repositories/assessment.repository";
 import { StudentRepository } from "../database/repositories/student.repository";
 import { SubmissionRepository } from "../database/repositories/submission.repository";
-import { extractPdfText } from "../pdf/pdf-extractor";
+import { extractDocumentText } from "../pdf/document-extractor";
+import { convertDocxToPdf } from "../pdf/docx-to-pdf";
 import { logger } from "../shared/logger";
 import { MoodleAssignmentScraper } from "./moodle-assignment.scraper";
 import { MoodleAuthService } from "./moodle-auth.service";
 import { MoodleDiscussionScraper } from "./moodle-discussion.scraper";
 import { MoodleDownloadService } from "./moodle-download.service";
 import { extractPdfEnrichmentsJob } from "../jobs/extract-pdf-enrichments.job";
+import { analyzeInstructionFilesJob } from "../jobs/analyze-instruction-files.job";
 import { enrichmentQueue } from "../jobs/queues";
 import { getDb } from "../database/db";
 import { nanoid } from "nanoid";
@@ -62,6 +64,22 @@ export class MoodleSyncService {
           courseContext: overview.courseContext,
         });
 
+        // Download + extract + analyze any instruction documents (PDF/DOCX)
+        // attached to the assignment description, while the session is open.
+        if (overview.instructionFiles?.length) {
+          try {
+            await analyzeInstructionFilesJob({
+              page,
+              activityId,
+              title: overview.title,
+              htmlInstruction: overview.instruction,
+              files: overview.instructionFiles,
+            });
+          } catch (error) {
+            logger.warn("Instruction analysis failed", error);
+          }
+        }
+
         await page.goto(assignmentGradingUrl(activity.url), { waitUntil: "networkidle2", timeout: 45_000 });
         await scraper.showAllGradingRows(page);
         const students = await scraper.scrapeGrading(page);
@@ -84,25 +102,57 @@ export class MoodleSyncService {
           });
 
           for (const pdf of item.pdfUrls.slice(0, 5)) {
+            let filePath: string | null = null;
             try {
-              const filePath = await this.downloader.downloadWithSession(page, {
+              const destPath = this.downloader.getSafeDownloadPath(activityId, student.id, pdf.filename);
+              filePath = await this.downloader.downloadFileWithSession(page, {
                 url: pdf.url,
-                activityId,
-                studentId: student.id,
-                filename: pdf.filename,
-              });
-              const extracted = await extractPdfText(filePath);
-              extractedText += `\n\n${extracted.text}`;
-              this.submissions.addFile({
-                submissionId,
-                filename: pdf.filename,
-                mimeType: "application/pdf",
-                filePath,
-                extractedTextPath: extracted.outputPath,
+                destPath,
               });
             } catch (error) {
-              logger.warn("PDF download or extraction failed", error);
+              logger.warn("Submission file download failed", error);
+              continue;
             }
+
+            // Record the file immediately so it shows in the UI even if text
+            // extraction fails afterwards.
+            let extractedTextPath: string | null = null;
+            try {
+              const extracted = await extractDocumentText(filePath);
+              if (extracted.text.trim()) {
+                extractedText += `\n\n${extracted.text}`;
+                extractedTextPath = extracted.outputPath;
+              }
+            } catch (error) {
+              logger.warn("Submission file extraction failed", error);
+            }
+
+            const lowerName = pdf.filename.toLowerCase();
+            const isDocx = lowerName.endsWith(".docx");
+            const mimeType = isDocx
+              ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              : lowerName.endsWith(".doc")
+                ? "application/msword"
+                : "application/pdf";
+
+            // For DOCX, render a previewable PDF using the open Chrome session.
+            let previewPdfPath: string | null = null;
+            if (isDocx) {
+              try {
+                previewPdfPath = await convertDocxToPdf(filePath, { browser: browser! });
+              } catch (error) {
+                logger.warn("DOCX to PDF preview conversion failed", error);
+              }
+            }
+
+            this.submissions.addFile({
+              submissionId,
+              filename: pdf.filename,
+              mimeType,
+              filePath,
+              previewPdfPath,
+              extractedTextPath,
+            });
           }
 
           if (extractedText.trim()) {

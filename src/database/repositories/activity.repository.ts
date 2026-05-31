@@ -45,6 +45,23 @@ export class ActivityRepository {
       .run(input.title ?? null, input.instruction ?? null, input.prompt ?? null, input.courseContext ?? null, id);
   }
 
+  updateInstructionFiles(id: string, files: unknown) {
+    getDb()
+      .query("UPDATE moodle_activities SET instruction_files = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?")
+      .run(JSON.stringify(files ?? []), id);
+  }
+
+  updateInstructionAnalysis(
+    id: string,
+    input: { docText?: string | null; brief?: string | null },
+  ) {
+    getDb()
+      .query(
+        "UPDATE moodle_activities SET instruction_doc_text = COALESCE(?, instruction_doc_text), instruction_brief = COALESCE(?, instruction_brief), updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      )
+      .run(input.docText ?? null, input.brief ?? null, id);
+  }
+
   refreshCounts(id: string) {
     getDb()
       .query(

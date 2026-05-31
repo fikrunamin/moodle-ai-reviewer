@@ -67,13 +67,13 @@ export class SubmissionRepository {
     return id;
   }
 
-  addFile(input: { submissionId: string; filename: string; mimeType?: string | null; filePath: string; extractedTextPath?: string | null }) {
+  addFile(input: { submissionId: string; filename: string; mimeType?: string | null; filePath: string; previewPdfPath?: string | null; extractedTextPath?: string | null }) {
     const id = nanoid();
     getDb()
       .query(
-        "INSERT INTO moodle_submission_files (id, submission_id, filename, mime_type, file_path, extracted_text_path) VALUES (?, ?, ?, ?, ?, ?)",
+        "INSERT INTO moodle_submission_files (id, submission_id, filename, mime_type, file_path, preview_pdf_path, extracted_text_path) VALUES (?, ?, ?, ?, ?, ?, ?)",
       )
-      .run(id, input.submissionId, input.filename, input.mimeType ?? null, input.filePath, input.extractedTextPath ?? null);
+      .run(id, input.submissionId, input.filename, input.mimeType ?? null, input.filePath, input.previewPdfPath ?? null, input.extractedTextPath ?? null);
     return id;
   }
 }

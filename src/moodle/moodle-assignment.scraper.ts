@@ -1,6 +1,12 @@
 import type { Page } from "puppeteer-core";
 import { moodleSelectors } from "./moodle-selectors";
 
+export interface ScrapedInstructionFile {
+  url: string;
+  filename: string;
+  kind: "pdf" | "docx" | "other";
+}
+
 export interface ScrapedAssignmentStudent {
   studentName: string;
   email?: string | null;
@@ -14,11 +20,14 @@ export interface ScrapedAssignment {
   title: string;
   courseContext: string;
   instruction: string;
+  instructionFiles: ScrapedInstructionFile[];
   students: ScrapedAssignmentStudent[];
 }
 
 export class MoodleAssignmentScraper {
-  async scrapeOverview(page: Page): Promise<Pick<ScrapedAssignment, "title" | "instruction" | "courseContext">> {
+  async scrapeOverview(
+    page: Page,
+  ): Promise<Pick<ScrapedAssignment, "title" | "instruction" | "courseContext" | "instructionFiles">> {
     return page.evaluate((selectors) => {
       const text = (element: Element | null) => element?.textContent?.replace(/\s+/g, " ").trim() ?? "";
       const title = text(document.querySelector(selectors.activityTitle)) || document.title || "Moodle Assignment";
@@ -36,7 +45,48 @@ export class MoodleAssignmentScraper {
         text(document.querySelector(".box.generalbox")) ||
         text(document.querySelector(selectors.regionMain));
 
-      return { title, instruction, courseContext };
+      // Collect attachment links from the intro / description / activity files area.
+      const scopes = [
+        "#intro",
+        ".activity-description",
+        ".assignmentintro",
+        "[data-region='activity-information']",
+        ".box.generalbox",
+        "#region-main .no-overflow",
+      ];
+      const scopeEls = scopes
+        .map((selector) => document.querySelector(selector))
+        .filter((el): el is Element => Boolean(el));
+      const searchRoots = scopeEls.length ? scopeEls : [document.querySelector("#region-main")].filter(Boolean) as Element[];
+
+      const seen = new Set<string>();
+      const instructionFiles: Array<{ url: string; filename: string; kind: "pdf" | "docx" | "other" }> = [];
+      for (const root of searchRoots) {
+        const anchors = Array.from(root.querySelectorAll("a[href]")) as HTMLAnchorElement[];
+        for (const anchor of anchors) {
+          const href = anchor.href;
+          if (!href) continue;
+          // Only Moodle file links or direct doc links.
+          const isPluginFile = /pluginfile\.php/i.test(href) || /\/mod_assign\//i.test(href);
+          const label = text(anchor) || href.split("/").pop() || "";
+          const lowerHref = href.toLowerCase();
+          const lowerLabel = label.toLowerCase();
+          const isPdf = lowerHref.includes(".pdf") || lowerLabel.endsWith(".pdf");
+          const isDocx = lowerHref.includes(".docx") || lowerLabel.endsWith(".docx");
+          const isDoc = lowerHref.includes(".doc") || lowerLabel.endsWith(".doc");
+          if (!isPdf && !isDocx && !isDoc && !(isPluginFile && /\.(pdf|docx?|odt)/i.test(href))) continue;
+          if (seen.has(href)) continue;
+          seen.add(href);
+          const decoded = decodeURIComponent(label || href.split("/").pop() || "instruksi");
+          instructionFiles.push({
+            url: href,
+            filename: decoded,
+            kind: isPdf ? "pdf" : isDocx ? "docx" : "other",
+          });
+        }
+      }
+
+      return { title, instruction, courseContext, instructionFiles };
     }, moodleSelectors);
   }
 
@@ -99,8 +149,15 @@ export class MoodleAssignmentScraper {
               const anchor = link as HTMLAnchorElement;
               const href = anchor.href;
               const label = text(anchor);
-              if (!href.toLowerCase().includes(".pdf") && !label.toLowerCase().endsWith(".pdf")) return null;
-              return { url: href, filename: label || href.split("/").pop() || "submission.pdf" };
+              const lowerHref = href.toLowerCase();
+              const lowerLabel = label.toLowerCase();
+              const isDoc =
+                /\.(pdf|docx|doc)(\?|$)/i.test(lowerHref) ||
+                /\.(pdf|docx|doc)$/i.test(lowerLabel) ||
+                (/pluginfile\.php/i.test(href) && /\.(pdf|docx|doc)/i.test(href));
+              if (!isDoc) return null;
+              const filename = decodeURIComponent(label || href.split("/").pop()?.split("?")[0] || "submission");
+              return { url: href, filename };
             })
             .filter(Boolean) as Array<{ url: string; filename: string }>;
 

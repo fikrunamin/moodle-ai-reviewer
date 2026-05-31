@@ -23,14 +23,42 @@ interface Detail {
     title: string;
     course_context: string | null;
     instruction: string | null;
+    instruction_files: string | null;
+    instruction_brief: string | null;
+    instruction_doc_text: string | null;
     prompt: string | null;
     rubric_file_path: string | null;
     rubric_ai_json: string | null;
     rubric_extracted_text: string | null;
   };
   submission: { id?: string; submission_text: string | null; extracted_text: string | null } | null;
-  files: Array<{ id: string; filename: string; file_path: string; extracted_text_path: string | null }>;
+  files: Array<{ id: string; filename: string; file_path: string; preview_pdf_path: string | null; extracted_text_path: string | null }>;
   posts: Array<{ content: string; reply_to: string | null }>;
+}
+
+interface InstructionFileMeta {
+  url: string;
+  filename: string;
+  kind: "pdf" | "docx" | "other";
+}
+
+interface InstructionBrief {
+  summary?: string;
+  objectives?: string[];
+  deliverables?: string[];
+  requirements?: string[];
+  deadline?: string | null;
+  submission_format?: string | null;
+  grading_notes?: string[];
+}
+
+function parseJson<T>(value: string | null): T | null {
+  if (!value) return null;
+  try {
+    return JSON.parse(value) as T;
+  } catch {
+    return null;
+  }
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -38,6 +66,84 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     <div className="grid gap-1">
       <span className="win-section-title">{label}</span>
       <div className="win-inset px-3 py-2 text-[12.5px] leading-relaxed text-secondary">{children}</div>
+    </div>
+  );
+}
+
+function BriefList({ label, items }: { label: string; items?: string[] }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <div className="grid gap-0.5">
+      <span className="text-[11px] font-semibold text-muted">{label}</span>
+      <ul className="ml-4 grid list-disc gap-0.5 text-[12px] leading-relaxed">
+        {items.map((item, index) => (
+          <li key={index}>{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function InstructionBriefView({
+  brief,
+  files,
+}: {
+  brief: InstructionBrief | null;
+  files: InstructionFileMeta[];
+}) {
+  const hasBrief =
+    brief &&
+    (brief.summary ||
+      brief.objectives?.length ||
+      brief.deliverables?.length ||
+      brief.requirements?.length ||
+      brief.grading_notes?.length ||
+      brief.deadline ||
+      brief.submission_format);
+
+  if (!hasBrief && files.length === 0) return null;
+
+  return (
+    <div className="grid gap-1">
+      <span className="win-section-title">Arahan tugas (dari dokumen)</span>
+      <div className="win-inset grid gap-2 px-3 py-2 text-[12.5px] leading-relaxed text-secondary">
+        {files.length ? (
+          <div className="flex flex-wrap gap-1">
+            {files.map((file) => (
+              <a
+                key={file.url}
+                className="win-status"
+                href={file.url}
+                target="_blank"
+                rel="noreferrer"
+                title={file.filename}
+              >
+                {file.kind.toUpperCase()} · {file.filename}
+              </a>
+            ))}
+          </div>
+        ) : null}
+        {brief?.summary ? <p>{brief.summary}</p> : null}
+        <BriefList label="Tujuan" items={brief?.objectives} />
+        <BriefList label="Yang dikumpulkan" items={brief?.deliverables} />
+        <BriefList label="Persyaratan" items={brief?.requirements} />
+        <BriefList label="Yang dinilai" items={brief?.grading_notes} />
+        {brief?.deadline ? (
+          <p className="text-[12px]">
+            <span className="text-muted">Deadline:</span> {brief.deadline}
+          </p>
+        ) : null}
+        {brief?.submission_format ? (
+          <p className="text-[12px]">
+            <span className="text-muted">Format:</span> {brief.submission_format}
+          </p>
+        ) : null}
+        {!hasBrief && files.length ? (
+          <p className="text-[11.5px] text-muted">
+            File instruksi terdeteksi. Analisa arahan akan muncul setelah sync dengan AI aktif.
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -127,6 +233,10 @@ export function AssessmentDetailPanel({
             <Field label="Arahan tugas">
               <p className="max-h-48 overflow-auto whitespace-pre-wrap">{detail?.activity.instruction ?? "-"}</p>
             </Field>
+            <InstructionBriefView
+              brief={parseJson<InstructionBrief>(detail?.activity.instruction_brief ?? null)}
+              files={parseJson<InstructionFileMeta[]>(detail?.activity.instruction_files ?? null) ?? []}
+            />
             <Field label="Rubrik">
               <pre className="max-h-40 overflow-auto whitespace-pre-wrap text-[11.5px]">
                 {detail?.activity.rubric_ai_json || detail?.activity.rubric_extracted_text || "Rubrik default digunakan."}
@@ -138,7 +248,12 @@ export function AssessmentDetailPanel({
               {detail?.files.length ? (
                 <div className="grid gap-3">
                   {detail.files.map((file) => (
-                    <PdfFileCard key={file.id} fileId={file.id} filename={file.filename} />
+                    <PdfFileCard
+                      key={file.id}
+                      fileId={file.id}
+                      filename={file.filename}
+                      hasPdfPreview={Boolean(file.preview_pdf_path) || file.filename.toLowerCase().endsWith(".pdf")}
+                    />
                   ))}
                 </div>
               ) : (

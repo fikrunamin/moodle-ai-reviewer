@@ -16,6 +16,9 @@ CREATE TABLE IF NOT EXISTS moodle_activities (
   url TEXT NOT NULL,
   course_context TEXT,
   instruction TEXT,
+  instruction_files TEXT,
+  instruction_doc_text TEXT,
+  instruction_brief TEXT,
   prompt TEXT,
   rubric_file_path TEXT,
   rubric_extracted_text TEXT,
@@ -64,6 +67,7 @@ CREATE TABLE IF NOT EXISTS moodle_submission_files (
   filename TEXT NOT NULL,
   mime_type TEXT,
   file_path TEXT NOT NULL,
+  preview_pdf_path TEXT,
   extracted_text_path TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (submission_id) REFERENCES moodle_submissions(id)

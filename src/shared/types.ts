@@ -11,6 +11,9 @@ export interface MoodleActivity {
   url: string;
   course_context: string | null;
   instruction: string | null;
+  instruction_files: string | null;
+  instruction_doc_text: string | null;
+  instruction_brief: string | null;
   prompt: string | null;
   rubric_file_path: string | null;
   rubric_extracted_text: string | null;
@@ -24,6 +27,12 @@ export interface MoodleActivity {
   reviewed_students: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface InstructionFile {
+  url: string;
+  filename: string;
+  kind: "pdf" | "docx" | "other";
 }
 
 export interface MoodleStudent {
@@ -56,6 +65,7 @@ export interface MoodleSubmissionFile {
   filename: string;
   mime_type: string | null;
   file_path: string;
+  preview_pdf_path: string | null;
   extracted_text_path: string | null;
   created_at: string;
 }

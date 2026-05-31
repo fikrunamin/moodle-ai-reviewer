@@ -81,12 +81,36 @@ export function buildReferenceParserPrompt(input: { rawText: string; truncated: 
     "Jangan mengarang referensi. Hanya ekstrak yang benar-benar tertulis di teks.",
     "Buat JSON valid tanpa markdown.",
     'Schema: {"references":[{"raw_text":"string asli citation","authors":["nama lengkap penulis","..."],"year":2023,"title":"judul artikel/buku","source":"jurnal/penerbit/conference","doi":"10.xxxx/yyyy atau null","url":"https://... atau null","arxiv_id":"2301.xxxxx atau null"}]}',
-    "Jika tidak ada bagian referensi sama sekali, kembalikan {\"references\":[]}.",
+    'Jika tidak ada bagian referensi sama sekali, kembalikan {"references":[]}.',
     "Jangan masukkan in-text citation seperti (Smith, 2020). Hanya entry penuh dari daftar pustaka.",
     input.truncated
       ? "Catatan: teks dipotong, fokus mengekstrak referensi yang utuh saja."
       : "",
     `Teks dokumen:\n${input.rawText}`,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+export function buildInstructionAnalysisPrompt(input: {
+  title?: string | null;
+  htmlInstruction?: string | null;
+  documentText: string;
+  truncated: boolean;
+}) {
+  return [
+    "Anda adalah asisten dosen yang menganalisis dokumen instruksi/arahan tugas (dari file PDF atau DOCX yang dilampirkan dosen).",
+    "Tujuan: merangkum dokumen menjadi arahan tugas yang jelas dan terstruktur untuk dipakai sebagai konteks penilaian.",
+    "Jangan mengarang. Hanya gunakan informasi yang ada di dokumen dan deskripsi tugas.",
+    "Jangan memberi nilai. Jangan menyebut AI.",
+    "Tulis dalam Bahasa Indonesia akademik yang ringkas.",
+    "Buat JSON valid tanpa markdown.",
+    'Schema: {"summary":"ringkasan 2-4 kalimat tujuan tugas","objectives":["tujuan/learning outcome"],"deliverables":["yang harus dikumpulkan mahasiswa"],"requirements":["syarat teknis/format/aturan penting"],"deadline":"string atau null","submission_format":"string atau null","grading_notes":["hal yang akan dinilai jika disebutkan"]}',
+    "Jika sebuah field tidak disebutkan di dokumen, gunakan array kosong atau null.",
+    `Judul tugas: ${input.title ?? "-"}`,
+    `Deskripsi tugas di halaman Moodle: ${input.htmlInstruction ?? "-"}`,
+    input.truncated ? "Catatan: dokumen dipotong karena panjang, fokus pada bagian yang tersedia." : "",
+    `Isi dokumen instruksi:\n${input.documentText}`,
   ]
     .filter(Boolean)
     .join("\n\n");
