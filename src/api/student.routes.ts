@@ -6,7 +6,22 @@ import { ActivityRepository } from "../database/repositories/activity.repository
 
 export function registerStudentRoutes(app: Hono) {
   app.get("/api/activities/:activityId/students", (c) => {
-    return c.json(new StudentRepository().listByActivity(c.req.param("activityId")));
+    const activityId = c.req.param("activityId");
+    const students = getDb()
+      .query(
+        `SELECT s.*,
+                EXISTS(
+                  SELECT 1
+                  FROM moodle_submissions sub
+                  JOIN extracted_links link ON link.submission_id = sub.id
+                  WHERE sub.student_id = s.id AND link.kind = 'youtube'
+                ) AS has_youtube_link
+         FROM moodle_students s
+         WHERE s.activity_id = ?
+         ORDER BY s.student_name ASC`,
+      )
+      .all(activityId);
+    return c.json(students);
   });
 
   // App-only bulk delete. Does NOT delete anything in Moodle.

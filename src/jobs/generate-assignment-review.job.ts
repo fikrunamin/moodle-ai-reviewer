@@ -4,6 +4,85 @@ import { StudentRepository } from "../database/repositories/student.repository";
 import { SubmissionRepository } from "../database/repositories/submission.repository";
 import { AssignmentReviewAgent } from "../ai/assignment-review.agent";
 
+interface RubricCriterion {
+  name: string;
+  max_score: number;
+  description: string | null;
+}
+
+const defaultScores = [
+  { criteriaName: "Kesesuaian Instruksi", criteriaScore: 0, maxScore: 20, legacyKey: "instruction_match" },
+  { criteriaName: "Kreativitas Ide", criteriaScore: 0, maxScore: 20, legacyKey: "creativity" },
+  { criteriaName: "Teknik dan Bahan", criteriaScore: 0, maxScore: 20, legacyKey: "technique_material" },
+  { criteriaName: "Kualitas Hasil Akhir", criteriaScore: 0, maxScore: 20, legacyKey: "final_quality" },
+  { criteriaName: "Dokumentasi Proses", criteriaScore: 0, maxScore: 10, legacyKey: "documentation" },
+  { criteriaName: "Refleksi Mahasiswa", criteriaScore: 0, maxScore: 10, legacyKey: "reflection" },
+];
+
+function safeJson(value: string | null | undefined): unknown | null {
+  if (!value) return null;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function extractRubricCriteria(rubricJson: string | null | undefined): RubricCriterion[] {
+  const parsed = safeJson(rubricJson);
+  if (!parsed || typeof parsed !== "object") return [];
+  const criteria = (parsed as { criteria?: unknown }).criteria;
+  if (!Array.isArray(criteria)) return [];
+  return criteria
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as { name?: unknown; max_score?: unknown; maxScore?: unknown; description?: unknown };
+      const name = String(row.name ?? "").trim();
+      const maxScore = Number(row.max_score ?? row.maxScore ?? 0);
+      if (!name || !Number.isFinite(maxScore) || maxScore <= 0) return null;
+      return {
+        name,
+        max_score: maxScore,
+        description: row.description ? String(row.description) : null,
+      };
+    })
+    .filter((item): item is RubricCriterion => Boolean(item));
+}
+
+function normalizeName(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function clampScore(value: unknown, maxScore: number) {
+  const score = Number(value ?? 0);
+  if (!Number.isFinite(score)) return 0;
+  return Math.max(0, Math.min(maxScore, score));
+}
+
+function scoresFromDynamicRubric(result: any, rubricCriteria: RubricCriterion[]) {
+  const criteriaScores = Array.isArray(result?.criteria_scores)
+    ? (result.criteria_scores.filter((item: unknown) => item && typeof item === "object") as Array<Record<string, unknown>>)
+    : [];
+  const byName = new Map(criteriaScores.map((score) => [normalizeName(String(score.criteria_name ?? score.name ?? "")), score]));
+
+  return rubricCriteria.map((criterion) => {
+    const matched = byName.get(normalizeName(criterion.name));
+    return {
+      criteriaName: criterion.name,
+      criteriaScore: clampScore(matched?.criteria_score ?? matched?.score, criterion.max_score),
+      maxScore: criterion.max_score,
+    };
+  });
+}
+
+function scoresFromDefault(result: any) {
+  return defaultScores.map((score) => ({
+    criteriaName: score.criteriaName,
+    criteriaScore: clampScore(result?.scores?.[score.legacyKey], score.maxScore),
+    maxScore: score.maxScore,
+  }));
+}
+
 export async function generateAssignmentReviewJob(studentId: string) {
   const students = new StudentRepository();
   const submissions = new SubmissionRepository();
@@ -18,23 +97,19 @@ export async function generateAssignmentReviewJob(studentId: string) {
   students.updateAiStatus(studentId, "processing");
   try {
     const missingPdf = !submission?.extracted_text;
+    const rubricCriteria = extractRubricCriteria(activity.rubric_ai_json);
     const result = await new AssignmentReviewAgent().review({
       courseContext: activity.course_context,
       instruction: activity.instruction ?? "",
       rubricGuide: activity.rubric_ai_json ?? activity.rubric_extracted_text,
+      rubricCriteria,
       submissionText: submission?.submission_text ?? "",
       extractedText: submission?.extracted_text ?? "",
     });
 
-    const scores = [
-      { criteriaName: "Kesesuaian Instruksi", criteriaScore: Number(result.scores?.instruction_match ?? 0), maxScore: 20 },
-      { criteriaName: "Kreativitas Ide", criteriaScore: Number(result.scores?.creativity ?? 0), maxScore: 20 },
-      { criteriaName: "Teknik dan Bahan", criteriaScore: Number(result.scores?.technique_material ?? 0), maxScore: 20 },
-      { criteriaName: "Kualitas Hasil Akhir", criteriaScore: Number(result.scores?.final_quality ?? 0), maxScore: 20 },
-      { criteriaName: "Dokumentasi Proses", criteriaScore: Number(result.scores?.documentation ?? 0), maxScore: 10 },
-      { criteriaName: "Refleksi Mahasiswa", criteriaScore: Number(result.scores?.reflection ?? 0), maxScore: 10 },
-    ];
-    const recommendedScore = Number(result.recommended_score ?? scores.reduce((sum, score) => sum + score.criteriaScore, 0));
+    const scores = rubricCriteria.length ? scoresFromDynamicRubric(result, rubricCriteria) : scoresFromDefault(result);
+    const scoreSum = scores.reduce((sum, score) => sum + score.criteriaScore, 0);
+    const recommendedScore = Number.isFinite(Number(result.recommended_score)) ? Number(result.recommended_score) : scoreSum;
     const assessment = assessments.create({
       activityId: activity.id,
       studentId,

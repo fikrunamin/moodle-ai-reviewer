@@ -13,6 +13,15 @@ function safeName(activityId: string, filename: string) {
   return join(paths.downloads, `instruction_${activityId}_${cleaned}`);
 }
 
+function extractRubric(analysis: unknown): unknown | null {
+  if (!analysis || typeof analysis !== "object") return null;
+  const rubric = (analysis as { rubric?: unknown }).rubric;
+  if (!rubric || typeof rubric !== "object") return null;
+  const criteria = (rubric as { criteria?: unknown }).criteria;
+  if (!Array.isArray(criteria) || criteria.length === 0) return null;
+  return rubric;
+}
+
 /**
  * Download instruction attachments (PDF/DOCX) found in the assignment
  * description, extract their text, and ask the AI to turn them into a
@@ -63,6 +72,22 @@ export async function analyzeInstructionFilesJob(input: {
     activities.updateInstructionAnalysis(input.activityId, {
       brief: JSON.stringify(analysis),
     });
+
+    const rubric = extractRubric(analysis);
+    const activity = activities.find(input.activityId);
+    const hasExistingRubric = Boolean(
+      activity?.rubric_file_path || activity?.rubric_ai_json || activity?.rubric_extracted_text,
+    );
+    if (rubric && !hasExistingRubric) {
+      activities.updateRubric(input.activityId, {
+        status: "ready",
+        aiJson: JSON.stringify({
+          source: "instruction_document",
+          ...((rubric as Record<string, unknown>) ?? {}),
+        }),
+        error: null,
+      });
+    }
   } catch (error) {
     logger.warn("Instruction analysis AI skipped or failed", error);
   }

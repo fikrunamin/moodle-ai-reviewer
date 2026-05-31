@@ -50,6 +50,10 @@ interface InstructionBrief {
   deadline?: string | null;
   submission_format?: string | null;
   grading_notes?: string[];
+  rubric?: {
+    rubric_summary?: string;
+    criteria?: Array<{ name?: string; max_score?: number; description?: string }>;
+  } | null;
 }
 
 function parseJson<T>(value: string | null): T | null {
@@ -99,7 +103,8 @@ function InstructionBriefView({
       brief.requirements?.length ||
       brief.grading_notes?.length ||
       brief.deadline ||
-      brief.submission_format);
+      brief.submission_format ||
+      brief.rubric?.criteria?.length);
 
   if (!hasBrief && files.length === 0) return null;
 
@@ -128,6 +133,21 @@ function InstructionBriefView({
         <BriefList label="Yang dikumpulkan" items={brief?.deliverables} />
         <BriefList label="Persyaratan" items={brief?.requirements} />
         <BriefList label="Yang dinilai" items={brief?.grading_notes} />
+        {brief?.rubric?.criteria?.length ? (
+          <div className="grid gap-1">
+            <span className="text-[11px] font-semibold text-muted">Rubrik terdeteksi</span>
+            {brief.rubric.rubric_summary ? <p className="text-[12px]">{brief.rubric.rubric_summary}</p> : null}
+            <ul className="ml-4 grid list-disc gap-0.5 text-[12px] leading-relaxed">
+              {brief.rubric.criteria.map((criteria, index) => (
+                <li key={index}>
+                  {criteria.name ?? "Kriteria"}
+                  {criteria.max_score ? ` (${criteria.max_score})` : ""}
+                  {criteria.description ? `: ${criteria.description}` : ""}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {brief?.deadline ? (
           <p className="text-[12px]">
             <span className="text-muted">Deadline:</span> {brief.deadline}
@@ -159,6 +179,7 @@ export function AssessmentDetailPanel({
   const [detail, setDetail] = useState<Detail | null>(null);
   const [busy, setBusy] = useState(false);
   const [generateStatus, setGenerateStatus] = useState<string | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
 
   const refresh = () => {
     if (!studentId) {
@@ -177,6 +198,15 @@ export function AssessmentDetailPanel({
   useEffect(() => {
     refresh();
   }, [studentId]);
+
+  useEffect(() => {
+    if (!fullscreen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setFullscreen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [fullscreen]);
 
   const submissionId = detail?.submission?.id ?? null;
 
@@ -205,17 +235,25 @@ export function AssessmentDetailPanel({
   }
 
   const type = detail?.activity.type ?? activityType;
+  const panelClass = fullscreen
+    ? "win-window win-scroll fixed inset-2 z-50 flex flex-col overflow-y-auto shadow-2xl"
+    : "win-window win-scroll flex h-full flex-col overflow-y-auto";
 
   return (
-    <div className="win-window win-scroll flex h-full flex-col overflow-y-auto">
+    <div className={panelClass}>
       <div className="win-titlebar sticky top-0 z-10">
         <div className="min-w-0">
           <h2 className="truncate text-[13px] font-semibold">{detail?.student.student_name ?? "Assessment"}</h2>
           <p className="truncate text-[11px] text-muted">{type ?? "No activity selected"}</p>
         </div>
-        <button className="win-button win-button-primary" disabled={busy} onClick={generate}>
-          {busy ? "Generating…" : "Generate"}
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <button className="win-button" onClick={() => setFullscreen((current) => !current)}>
+            {fullscreen ? "Exit fullscreen" : "Fullscreen"}
+          </button>
+          <button className="win-button win-button-primary" disabled={busy} onClick={generate}>
+            {busy ? "Generating…" : "Generate"}
+          </button>
+        </div>
       </div>
       <div className="grid gap-3 p-3">
         {generateStatus ? <p className="win-status">{generateStatus}</p> : null}

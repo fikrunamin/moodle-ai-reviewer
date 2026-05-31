@@ -2,6 +2,7 @@ export function buildAssignmentPrompt(input: {
   courseContext?: string | null;
   instruction: string;
   rubricGuide?: string | null;
+  rubricCriteria?: Array<{ name: string; max_score: number; description?: string | null }> | null;
   submissionText: string;
   extractedText?: string | null;
 }) {
@@ -13,8 +14,16 @@ export function buildAssignmentPrompt(input: {
     "Anda adalah asisten dosen yang membantu membuat draft review akademik berdasarkan konteks mata kuliah dan tugas dari Moodle.",
     "AI hanya memberi rekomendasi, bukan nilai final.",
     "Buat draft review akademik dalam JSON valid tanpa markdown.",
-    'Schema: {"summary":"string","recommended_score":0,"scores":{"instruction_match":0,"creativity":0,"technique_material":0,"final_quality":0,"documentation":0,"reflection":0},"feedback":"string","manual_review_required":false,"manual_review_reason":null}',
+    input.rubricCriteria?.length
+      ? 'Schema: {"summary":"string","recommended_score":0,"criteria_scores":[{"criteria_name":"string harus sama dengan nama kriteria rubrik","criteria_score":0,"max_score":0}],"feedback":"string","manual_review_required":false,"manual_review_reason":null}'
+      : 'Schema: {"summary":"string","recommended_score":0,"scores":{"instruction_match":0,"creativity":0,"technique_material":0,"final_quality":0,"documentation":0,"reflection":0},"feedback":"string","manual_review_required":false,"manual_review_reason":null}',
     `Rubrik dan format penilaian: ${rubricGuide}`,
+    input.rubricCriteria?.length
+      ? `Daftar kriteria rubrik yang WAJIB dipakai untuk criteria_scores, urutan dan max_score harus sama persis: ${JSON.stringify(input.rubricCriteria)}`
+      : "",
+    input.rubricCriteria?.length
+      ? "Jangan memakai breakdown default. Jangan membuat kriteria baru. Isi criteria_scores untuk setiap kriteria rubrik aktif."
+      : "",
     "Jika bukti tidak cukup atau PDF tidak terbaca, set manual_review_required=true dan jangan memberi skor tinggi.",
     `Konteks mata kuliah: ${input.courseContext ?? ""}`,
     `Instruksi: ${input.instruction}`,
@@ -105,8 +114,9 @@ export function buildInstructionAnalysisPrompt(input: {
     "Jangan memberi nilai. Jangan menyebut AI.",
     "Tulis dalam Bahasa Indonesia akademik yang ringkas.",
     "Buat JSON valid tanpa markdown.",
-    'Schema: {"summary":"ringkasan 2-4 kalimat tujuan tugas","objectives":["tujuan/learning outcome"],"deliverables":["yang harus dikumpulkan mahasiswa"],"requirements":["syarat teknis/format/aturan penting"],"deadline":"string atau null","submission_format":"string atau null","grading_notes":["hal yang akan dinilai jika disebutkan"]}',
+    'Schema: {"summary":"ringkasan 2-4 kalimat tujuan tugas","objectives":["tujuan/learning outcome"],"deliverables":["yang harus dikumpulkan mahasiswa"],"requirements":["syarat teknis/format/aturan penting"],"deadline":"string atau null","submission_format":"string atau null","grading_notes":["hal yang akan dinilai jika disebutkan"],"rubric":null atau {"rubric_summary":"string","grading_instruction":"string","feedback_format":"string","criteria":[{"name":"string","max_score":0,"description":"string"}]}}',
     "Jika sebuah field tidak disebutkan di dokumen, gunakan array kosong atau null.",
+    "Jika dokumen arahan berisi rubrik, tabel penilaian, bobot, kriteria, indikator, atau poin penilaian, ekstrak ke field rubric. Jika tidak ada rubrik eksplisit, set rubric=null. Jangan membuat rubrik baru.",
     `Judul tugas: ${input.title ?? "-"}`,
     `Deskripsi tugas di halaman Moodle: ${input.htmlInstruction ?? "-"}`,
     input.truncated ? "Catatan: dokumen dipotong karena panjang, fokus pada bagian yang tersedia." : "",

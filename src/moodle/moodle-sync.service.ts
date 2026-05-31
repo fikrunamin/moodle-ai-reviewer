@@ -135,11 +135,12 @@ export class MoodleSyncService {
                 ? "application/msword"
                 : "application/pdf";
 
-            // For DOCX, render a previewable PDF using the open Chrome session.
+            // For DOCX, render a previewable PDF (LibreOffice) keeping images,
+            // links, and layout intact.
             let previewPdfPath: string | null = null;
             if (isDocx) {
               try {
-                previewPdfPath = await convertDocxToPdf(filePath, { browser: browser! });
+                previewPdfPath = await convertDocxToPdf(filePath);
               } catch (error) {
                 logger.warn("DOCX to PDF preview conversion failed", error);
               }
