@@ -8,7 +8,11 @@ interface RubricCriterion {
   name: string;
   max_score: number;
   description: string | null;
+  levels?: Array<{ score: number; definition: string }>;
 }
+
+const MAX_RUBRIC_DESCRIPTION_CHARS = 1200;
+const MAX_LEVEL_DEFINITION_CHARS = 1200;
 
 const defaultScores = [
   { criteriaName: "Kesesuaian Instruksi", criteriaScore: 0, maxScore: 20, legacyKey: "instruction_match" },
@@ -40,10 +44,23 @@ function extractRubricCriteria(rubricJson: string | null | undefined): RubricCri
       const name = String(row.name ?? "").trim();
       const maxScore = Number(row.max_score ?? row.maxScore ?? 0);
       if (!name || !Number.isFinite(maxScore) || maxScore <= 0) return null;
+      const levels = Array.isArray((row as { levels?: unknown }).levels)
+        ? ((row as { levels: unknown[] }).levels
+            .map((level) => {
+              if (!level || typeof level !== "object") return null;
+              const levelRow = level as { score?: unknown; definition?: unknown };
+              const score = Number(levelRow.score ?? 0);
+              const definition = String(levelRow.definition ?? "").trim().slice(0, MAX_LEVEL_DEFINITION_CHARS);
+              if (!Number.isFinite(score) || !definition) return null;
+              return { score, definition };
+            })
+            .filter((level): level is { score: number; definition: string } => Boolean(level)))
+        : [];
       return {
         name,
         max_score: maxScore,
-        description: row.description ? String(row.description) : null,
+        description: row.description ? String(row.description).slice(0, MAX_RUBRIC_DESCRIPTION_CHARS) : null,
+        ...(levels.length ? { levels } : {}),
       };
     })
     .filter((item): item is RubricCriterion => Boolean(item));
@@ -59,6 +76,28 @@ function clampScore(value: unknown, maxScore: number) {
   return Math.max(0, Math.min(maxScore, score));
 }
 
+function scoreFromCriterionLevel(value: unknown, criterion: RubricCriterion) {
+  const score = clampScore(value, criterion.max_score);
+  if (!criterion.levels?.length) return score;
+  return criterion.levels.reduce((closest, level) =>
+    Math.abs(level.score - score) < Math.abs(closest.score - score) ? level : closest,
+  ).score;
+}
+
+function extractRubricGuide(value: string | null | undefined) {
+  const parsed = safeJson(value);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return value;
+  const rubric = parsed as Record<string, unknown>;
+  return [
+    rubric.source ? `Sumber rubrik: ${String(rubric.source)}` : null,
+    rubric.rubric_summary ? `Ringkasan: ${String(rubric.rubric_summary)}` : null,
+    rubric.grading_instruction ? `Instruksi penilaian: ${String(rubric.grading_instruction)}` : null,
+    rubric.feedback_format ? `Format feedback: ${String(rubric.feedback_format)}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 function scoresFromDynamicRubric(result: any, rubricCriteria: RubricCriterion[]) {
   const criteriaScores = Array.isArray(result?.criteria_scores)
     ? (result.criteria_scores.filter((item: unknown) => item && typeof item === "object") as Array<Record<string, unknown>>)
@@ -67,9 +106,10 @@ function scoresFromDynamicRubric(result: any, rubricCriteria: RubricCriterion[])
 
   return rubricCriteria.map((criterion) => {
     const matched = byName.get(normalizeName(criterion.name));
+    const scoreValue = matched?.recommended_level_score ?? matched?.level_score ?? matched?.criteria_score ?? matched?.score;
     return {
       criteriaName: criterion.name,
-      criteriaScore: clampScore(matched?.criteria_score ?? matched?.score, criterion.max_score),
+      criteriaScore: scoreValue == null ? 0 : scoreFromCriterionLevel(scoreValue, criterion),
       maxScore: criterion.max_score,
     };
   });
@@ -101,7 +141,7 @@ export async function generateAssignmentReviewJob(studentId: string) {
     const result = await new AssignmentReviewAgent().review({
       courseContext: activity.course_context,
       instruction: activity.instruction ?? "",
-      rubricGuide: activity.rubric_ai_json ?? activity.rubric_extracted_text,
+      rubricGuide: extractRubricGuide(activity.rubric_ai_json) || activity.rubric_extracted_text,
       rubricCriteria,
       submissionText: submission?.submission_text ?? "",
       extractedText: submission?.extracted_text ?? "",

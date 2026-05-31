@@ -6,7 +6,7 @@ import { SubmissionRepository } from "../database/repositories/submission.reposi
 import { extractDocumentText } from "../pdf/document-extractor";
 import { convertDocxToPdf } from "../pdf/docx-to-pdf";
 import { logger } from "../shared/logger";
-import { MoodleAssignmentScraper } from "./moodle-assignment.scraper";
+import { MoodleAssignmentScraper, type ScrapedAdvancedRubric } from "./moodle-assignment.scraper";
 import { MoodleAuthService } from "./moodle-auth.service";
 import { MoodleDiscussionScraper } from "./moodle-discussion.scraper";
 import { MoodleDownloadService } from "./moodle-download.service";
@@ -15,7 +15,8 @@ import { analyzeInstructionFilesJob } from "../jobs/analyze-instruction-files.jo
 import { enrichmentQueue } from "../jobs/queues";
 import { getDb } from "../database/db";
 import { nanoid } from "nanoid";
-import type { Browser } from "puppeteer-core";
+import type { Browser, Page } from "puppeteer-core";
+import type { MoodleActivity } from "../shared/types";
 
 function assignmentMainUrl(url: string) {
   const parsed = new URL(url);
@@ -33,12 +34,79 @@ function assignmentGradingUrl(url: string) {
   return parsed.href;
 }
 
+function assignmentGraderUrl(url: string) {
+  const parsed = new URL(url);
+  parsed.searchParams.set("action", "grader");
+  parsed.searchParams.delete("page");
+  parsed.searchParams.delete("perpage");
+  return parsed.href;
+}
+
+function safeJsonObject(value: string | null | undefined): Record<string, unknown> | null {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+function shouldApplyMoodleRubric(activity: MoodleActivity | null) {
+  if (!activity) return true;
+  if (activity.rubric_file_path) return false;
+  if (activity.rubric_extracted_text && !activity.rubric_ai_json) return false;
+  const source = safeJsonObject(activity.rubric_ai_json)?.source;
+  return !activity.rubric_ai_json || source === "instruction_document" || source === "moodle_advanced_grading";
+}
+
+function rubricToText(rubric: ScrapedAdvancedRubric) {
+  return rubric.criteria
+    .map((criterion) => {
+      const levels = criterion.levels
+        .map((level) => `- ${level.score}: ${level.definition}`)
+        .join("\n");
+      return `${criterion.name} (maks ${criterion.max_score})\n${criterion.description}\n${levels}`.trim();
+    })
+    .join("\n\n");
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export class MoodleSyncService {
   private readonly activities = new ActivityRepository();
   private readonly assessments = new AssessmentRepository();
   private readonly students = new StudentRepository();
   private readonly submissions = new SubmissionRepository();
   private readonly downloader = new MoodleDownloadService();
+
+  private async scrapeAdvancedRubricFromUrl(
+    page: Page,
+    scraper: MoodleAssignmentScraper,
+    url: string,
+  ) {
+    try {
+      await page.goto(url, { waitUntil: "networkidle2", timeout: 45_000 });
+      await wait(3_000);
+      return await scraper.scrapeAdvancedRubric(page);
+    } catch (error) {
+      logger.warn("Moodle advanced grading rubric scrape failed", error);
+      return null;
+    }
+  }
+
+  private updateRubricFromMoodle(activityId: string, rubric: ScrapedAdvancedRubric) {
+    const current = this.activities.find(activityId);
+    if (!shouldApplyMoodleRubric(current)) return;
+    this.activities.updateRubric(activityId, {
+      status: "ready",
+      extractedText: rubricToText(rubric),
+      aiJson: JSON.stringify(rubric),
+      error: null,
+    });
+  }
 
   async syncActivity(activityId: string) {
     const activity = this.activities.find(activityId);
@@ -80,9 +148,24 @@ export class MoodleSyncService {
           }
         }
 
+        let advancedRubric = await this.scrapeAdvancedRubricFromUrl(
+          page,
+          scraper,
+          assignmentGraderUrl(activity.url),
+        );
+        if (advancedRubric) this.updateRubricFromMoodle(activityId, advancedRubric);
+
         await page.goto(assignmentGradingUrl(activity.url), { waitUntil: "networkidle2", timeout: 45_000 });
         await scraper.showAllGradingRows(page);
         const students = await scraper.scrapeGrading(page);
+
+        if (!advancedRubric) {
+          const graderUrl = await scraper.findFirstGraderUrl(page);
+          if (graderUrl) {
+            advancedRubric = await this.scrapeAdvancedRubricFromUrl(page, scraper, graderUrl);
+            if (advancedRubric) this.updateRubricFromMoodle(activityId, advancedRubric);
+          }
+        }
 
         for (const item of students) {
           const student = this.students.upsert({

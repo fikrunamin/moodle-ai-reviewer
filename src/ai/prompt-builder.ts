@@ -1,21 +1,45 @@
+function boundedText(value: string | null | undefined, maxChars: number, label: string) {
+  const text = value ?? "";
+  if (!Number.isFinite(maxChars) || maxChars <= 0 || text.length <= maxChars) return text;
+  return `${text.slice(0, maxChars)}\n\n[${label} dipotong untuk menjaga request AI tetap responsif. Total karakter asli: ${text.length}.]`;
+}
+
 export function buildAssignmentPrompt(input: {
   courseContext?: string | null;
   instruction: string;
   rubricGuide?: string | null;
-  rubricCriteria?: Array<{ name: string; max_score: number; description?: string | null }> | null;
+  rubricCriteria?: Array<{
+    name: string;
+    max_score: number;
+    description?: string | null;
+    levels?: Array<{ score: number; definition: string }>;
+  }> | null;
   submissionText: string;
   extractedText?: string | null;
 }) {
-  const rubricGuide =
+  const rubricGuide = boundedText(
     input.rubricGuide ||
-    "Rubrik default: Kesesuaian Instruksi 20, Kreativitas Ide 20, Teknik dan Bahan 20, Kualitas Hasil Akhir 20, Dokumentasi Proses 10, Refleksi Mahasiswa 10.";
+      "Rubrik default: Kesesuaian Instruksi 20, Kreativitas Ide 20, Teknik dan Bahan 20, Kualitas Hasil Akhir 20, Dokumentasi Proses 10, Refleksi Mahasiswa 10.",
+    Number(process.env.REVIEW_RUBRIC_GUIDE_MAX_CHARS ?? 4000),
+    "Rubrik",
+  );
+  const submissionText = boundedText(
+    input.submissionText,
+    Number(process.env.REVIEW_SUBMISSION_TEXT_MAX_CHARS ?? 8000),
+    "Submission",
+  );
+  const extractedText = boundedText(
+    input.extractedText,
+    Number(process.env.REVIEW_EXTRACTED_TEXT_MAX_CHARS ?? 24000),
+    "Teks PDF",
+  );
 
   return [
     "Anda adalah asisten dosen yang membantu membuat draft review akademik berdasarkan konteks mata kuliah dan tugas dari Moodle.",
     "AI hanya memberi rekomendasi, bukan nilai final.",
     "Buat draft review akademik dalam JSON valid tanpa markdown.",
     input.rubricCriteria?.length
-      ? 'Schema: {"summary":"string","recommended_score":0,"criteria_scores":[{"criteria_name":"string harus sama dengan nama kriteria rubrik","criteria_score":0,"max_score":0}],"feedback":"string","manual_review_required":false,"manual_review_reason":null}'
+      ? 'Schema: {"summary":"string","recommended_score":0,"criteria_scores":[{"criteria_name":"string harus sama dengan nama kriteria rubrik","criteria_score":0,"max_score":0,"recommended_level_score":0,"recommended_level_definition":"string atau null"}],"feedback":"string","manual_review_required":false,"manual_review_reason":null}'
       : 'Schema: {"summary":"string","recommended_score":0,"scores":{"instruction_match":0,"creativity":0,"technique_material":0,"final_quality":0,"documentation":0,"reflection":0},"feedback":"string","manual_review_required":false,"manual_review_reason":null}',
     `Rubrik dan format penilaian: ${rubricGuide}`,
     input.rubricCriteria?.length
@@ -24,11 +48,14 @@ export function buildAssignmentPrompt(input: {
     input.rubricCriteria?.length
       ? "Jangan memakai breakdown default. Jangan membuat kriteria baru. Isi criteria_scores untuk setiap kriteria rubrik aktif."
       : "",
+    input.rubricCriteria?.some((criterion) => criterion.levels?.length)
+      ? "Jika kriteria memiliki levels Moodle, criteria_score dan recommended_level_score HARUS sama dengan score salah satu level pada kriteria tersebut. Teacher akan memilih level final di halaman grader Moodle; tugas AI adalah memberi rekomendasi level paling sesuai berdasarkan bukti."
+      : "",
     "Jika bukti tidak cukup atau PDF tidak terbaca, set manual_review_required=true dan jangan memberi skor tinggi.",
     `Konteks mata kuliah: ${input.courseContext ?? ""}`,
     `Instruksi: ${input.instruction}`,
-    `Submission: ${input.submissionText}`,
-    `Teks PDF: ${input.extractedText ?? ""}`,
+    `Submission: ${submissionText}`,
+    `Teks PDF: ${extractedText}`,
   ].join("\n\n");
 }
 

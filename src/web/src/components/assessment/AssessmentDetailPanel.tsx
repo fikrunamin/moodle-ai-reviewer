@@ -56,6 +56,24 @@ interface InstructionBrief {
   } | null;
 }
 
+interface AdvancedRubricLevel {
+  score: number;
+  definition: string;
+}
+
+interface AdvancedRubricCriterion {
+  name: string;
+  max_score: number;
+  description?: string | null;
+  levels?: AdvancedRubricLevel[];
+}
+
+interface AdvancedRubric {
+  source?: string;
+  rubric_summary?: string;
+  criteria?: AdvancedRubricCriterion[];
+}
+
 function parseJson<T>(value: string | null): T | null {
   if (!value) return null;
   try {
@@ -84,6 +102,92 @@ function BriefList({ label, items }: { label: string; items?: string[] }) {
           <li key={index}>{item}</li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function normalizeCriteriaName(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function nearestLevel(levels: AdvancedRubricLevel[], score: number) {
+  return levels.reduce((closest, level) =>
+    Math.abs(level.score - score) < Math.abs(closest.score - score) ? level : closest,
+  );
+}
+
+function AdvancedRubricBreakdown({
+  rubric,
+  scores,
+}: {
+  rubric: AdvancedRubric | null;
+  scores?: Array<{ criteria_name: string; criteria_score: number; max_score: number }>;
+}) {
+  if (rubric?.source !== "moodle_advanced_grading" || !rubric.criteria?.some((criterion) => criterion.levels?.length)) {
+    return null;
+  }
+
+  const scoreByName = new Map(
+    (scores ?? []).map((score) => [normalizeCriteriaName(score.criteria_name), score]),
+  );
+
+  return (
+    <div className="grid gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="win-section-title">Advanced rubric breakdown</span>
+        <span className="win-status text-muted">Teacher pilih level final di Moodle</span>
+      </div>
+      {rubric.rubric_summary ? <p className="win-status text-muted">{rubric.rubric_summary}</p> : null}
+      <div className="grid gap-2">
+        {rubric.criteria.map((criterion, index) => {
+          const levels = criterion.levels ?? [];
+          const aiScore = scoreByName.get(normalizeCriteriaName(criterion.name));
+          const recommended = aiScore && levels.length ? nearestLevel(levels, Number(aiScore.criteria_score)) : null;
+          return (
+            <div className="win-inset grid gap-2 px-3 py-2" key={`${criterion.name}-${index}`}>
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[12.5px] font-semibold">{criterion.name}</p>
+                  {criterion.description ? <p className="mt-1 text-[11.5px] leading-relaxed text-muted">{criterion.description}</p> : null}
+                </div>
+                <span className="win-status tabular-nums">
+                  AI: {aiScore ? aiScore.criteria_score : "-"}/{criterion.max_score}
+                </span>
+              </div>
+              <div className="grid gap-1">
+                {levels.map((level) => {
+                  const isRecommended = recommended?.score === level.score;
+                  return (
+                    <div
+                      className="rounded-md border px-2 py-1.5 text-[11.5px] leading-relaxed"
+                      key={`${criterion.name}-${level.score}-${level.definition}`}
+                      style={
+                        isRecommended
+                          ? {
+                              background: "var(--bg-accent-soft)",
+                              borderColor: "var(--accent-strong)",
+                              color: "var(--text-primary)",
+                            }
+                          : {
+                              background: "var(--bg-elevated)",
+                              borderColor: "var(--border-soft)",
+                              color: "var(--text-secondary)",
+                            }
+                      }
+                    >
+                      <div className="mb-0.5 flex items-center justify-between gap-2">
+                        <strong className="tabular-nums">Level {level.score}</strong>
+                        {isRecommended ? <span className="win-status">AI rekomendasi</span> : null}
+                      </div>
+                      <p>{level.definition}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -361,6 +465,10 @@ export function AssessmentDetailPanel({
                 ))}
               </div>
             </div>
+            <AdvancedRubricBreakdown
+              rubric={parseJson<AdvancedRubric>(detail?.activity.rubric_ai_json ?? null)}
+              scores={assessment.scores}
+            />
             <CopyFeedbackBox feedback={assessment.feedback} />
           </section>
         )}

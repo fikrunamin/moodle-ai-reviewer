@@ -47,6 +47,13 @@ function extractFirstJsonObject(input: string): string | null {
   return null;
 }
 
+function isTimeoutError(error: unknown) {
+  return (
+    error instanceof DOMException &&
+    (error.name === "TimeoutError" || error.name === "AbortError" || error.code === DOMException.TIMEOUT_ERR)
+  );
+}
+
 export function parseJsonLoose(raw: string): unknown {
   const stripped = stripJsonFence(raw);
   try {
@@ -88,19 +95,30 @@ export class AiClient {
   }
 
   async completeJson(prompt: string, options: { timeoutMs?: number } = {}) {
-    const response = await this.fetch(`${this.options.baseUrl}/chat/completions`, {
-      method: "POST",
-      signal: options.timeoutMs ? AbortSignal.timeout(options.timeoutMs) : undefined,
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.options.apiKey}`,
-      },
-      body: JSON.stringify({
-        model: this.options.model,
-        response_format: { type: "json_object" },
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
+    const timeoutMs = options.timeoutMs ?? this.requestTimeoutMs();
+    let response: Response;
+    try {
+      response = await this.fetch(`${this.options.baseUrl}/chat/completions`, {
+        method: "POST",
+        signal: AbortSignal.timeout(timeoutMs),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.options.apiKey}`,
+        },
+        body: JSON.stringify({
+          model: this.options.model,
+          response_format: { type: "json_object" },
+          messages: [{ role: "user", content: prompt }],
+        }),
+      });
+    } catch (error) {
+      if (isTimeoutError(error)) {
+        throw new Error(
+          `AI request timed out after ${Math.round(timeoutMs / 1000)} seconds. Coba generate ulang atau naikkan REVIEW_AI_TIMEOUT_MS.`,
+        );
+      }
+      throw error;
+    }
 
     if (!response.ok) {
       throw await this.providerError(response, "AI request failed");

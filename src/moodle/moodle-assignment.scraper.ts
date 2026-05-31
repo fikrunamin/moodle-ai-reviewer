@@ -16,6 +16,27 @@ export interface ScrapedAssignmentStudent {
   pdfUrls: Array<{ url: string; filename: string }>;
 }
 
+export interface ScrapedAdvancedRubricLevel {
+  score: number;
+  definition: string;
+  selected: boolean;
+}
+
+export interface ScrapedAdvancedRubricCriterion {
+  name: string;
+  max_score: number;
+  description: string;
+  levels: ScrapedAdvancedRubricLevel[];
+}
+
+export interface ScrapedAdvancedRubric {
+  source: "moodle_advanced_grading";
+  rubric_summary: string;
+  grading_instruction: string;
+  feedback_format: string;
+  criteria: ScrapedAdvancedRubricCriterion[];
+}
+
 export interface ScrapedAssignment {
   title: string;
   courseContext: string;
@@ -121,6 +142,105 @@ export class MoodleAssignmentScraper {
         page.select(selectInfo.selector, selectInfo.value),
       ]);
     }
+  }
+
+  async findFirstGraderUrl(page: Page): Promise<string | null> {
+    return page.evaluate(() => {
+      const links = Array.from(document.querySelectorAll("a[href*='action=grader'], a[href*='action%3Dgrader']")) as HTMLAnchorElement[];
+      return links.find((link) => link.href)?.href ?? null;
+    });
+  }
+
+  async scrapeAdvancedRubric(page: Page): Promise<ScrapedAdvancedRubric | null> {
+    return page.evaluate(() => {
+      const clean = (value: string | null | undefined) => value?.replace(/\s+/g, " ").trim() ?? "";
+      const text = (element: Element | null) => clean(element?.textContent);
+      const lines = (element: Element | null) => {
+        if (!element) return [];
+        const raw = element instanceof HTMLElement ? element.innerText : element.textContent ?? "";
+        return raw
+          .split(/\n+/)
+          .map((line) => clean(line))
+          .filter(Boolean);
+      };
+      const parseScore = (value: string) => {
+        const normalized = value.replace(/,/g, ".");
+        const matches = Array.from(normalized.matchAll(/-?\d+(?:\.\d+)?/g));
+        const score = Number(matches.at(-1)?.[0]);
+        return Number.isFinite(score) ? score : null;
+      };
+
+      const root =
+        document.querySelector("#rubric-advancedgrading") ||
+        document.querySelector(".rubric-advancedgrading") ||
+        document.querySelector("[id*='rubric-advancedgrading']") ||
+        document.querySelector(".gradingform_rubric");
+      const rows = Array.from((root ?? document).querySelectorAll("tr.criterion"));
+
+      const criteria = rows
+        .map((row, criterionIndex) => {
+          const levelElements = Array.from(row.querySelectorAll("td.levels td.level"));
+          if (levelElements.length === 0) return null;
+
+          const descriptionCell = row.querySelector("td.description, th.description, .criteriondescription");
+          const descriptionLines = lines(descriptionCell);
+          const explicitName = text(
+            descriptionCell?.querySelector(
+              ".criterionname, .criterionshortname, .criterion-title, h3, h4, strong",
+            ) ?? null,
+          );
+          const description = descriptionLines.join(" ");
+          const name = explicitName || descriptionLines[0] || `Kriteria ${criterionIndex + 1}`;
+
+          const levels = levelElements.map((level, levelIndex) => {
+            const scoreText = text(level.querySelector(".score, .scorevalue, .levelscore"));
+            const scoreCandidates = [
+              scoreText,
+              level.getAttribute("data-score") ?? "",
+              level.getAttribute("aria-label") ?? "",
+              level.getAttribute("title") ?? "",
+              text(level),
+            ].filter(Boolean);
+            const parsedScore = scoreCandidates.map(parseScore).find((score): score is number => score !== null);
+            const definitionText =
+              text(level.querySelector(".definition, .leveldefinition, .leveldesc, .description")) ||
+              clean(text(level).replace(scoreText, ""));
+            return {
+              score: parsedScore ?? levelIndex,
+              definition: definitionText || `Level ${levelIndex + 1}`,
+              selected:
+                level.classList.contains("checked") ||
+                Boolean(level.querySelector("input:checked")) ||
+                level.getAttribute("aria-checked") === "true",
+            };
+          });
+          const maxScore = Math.max(...levels.map((level) => level.score));
+
+          return {
+            name,
+            max_score: Number.isFinite(maxScore) ? maxScore : levels.length - 1,
+            description,
+            levels,
+          };
+        })
+        .filter((criterion): criterion is {
+          name: string;
+          max_score: number;
+          description: string;
+          levels: Array<{ score: number; definition: string; selected: boolean }>;
+        } => Boolean(criterion));
+
+      if (criteria.length === 0) return null;
+      const totalScore = criteria.reduce((sum, criterion) => sum + criterion.max_score, 0);
+      return {
+        source: "moodle_advanced_grading" as const,
+        rubric_summary: `Rubrik Moodle Advanced Grading: ${criteria.length} kriteria, total maksimum ${totalScore} poin.`,
+        grading_instruction:
+          "Nilai setiap kriteria menggunakan level Moodle yang paling sesuai dengan bukti submission. Jangan membuat kriteria di luar rubrik Moodle.",
+        feedback_format: "Berikan ringkasan dan feedback akademik singkat yang menjelaskan alasan skor per kriteria.",
+        criteria,
+      };
+    });
   }
 
   async scrapeGrading(page: Page): Promise<ScrapedAssignmentStudent[]> {

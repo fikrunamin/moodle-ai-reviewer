@@ -7,6 +7,19 @@ export class SubmissionRepository {
     const db = getDb();
     const tx = db.transaction(() => {
       db.query(
+        `DELETE FROM pdf_summaries WHERE file_id IN (
+          SELECT f.id FROM moodle_submission_files f
+          JOIN moodle_submissions s ON s.id = f.submission_id
+          WHERE s.activity_id = ?
+        )`,
+      ).run(activityId);
+      db.query(
+        "DELETE FROM extracted_links WHERE submission_id IN (SELECT id FROM moodle_submissions WHERE activity_id = ?)",
+      ).run(activityId);
+      db.query(
+        "DELETE FROM extracted_references WHERE submission_id IN (SELECT id FROM moodle_submissions WHERE activity_id = ?)",
+      ).run(activityId);
+      db.query(
         "DELETE FROM moodle_submission_files WHERE submission_id IN (SELECT id FROM moodle_submissions WHERE activity_id = ?)",
       ).run(activityId);
       db.query("DELETE FROM moodle_submissions WHERE activity_id = ?").run(activityId);
