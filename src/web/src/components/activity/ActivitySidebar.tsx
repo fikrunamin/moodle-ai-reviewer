@@ -26,6 +26,7 @@ interface Props {
   onAddOptimistic: (activity: Activity) => void;
   onOpenSettings: () => void;
   onDeleteActivities: (ids: string[]) => Promise<void>;
+  onCollapse?: () => void;
 }
 
 export function ActivitySidebar({
@@ -36,6 +37,7 @@ export function ActivitySidebar({
   onAddOptimistic,
   onOpenSettings,
   onDeleteActivities,
+  onCollapse,
 }: Props) {
   const [filter, setFilter] = useState<"all" | "assignment" | "discussion">("all");
   const [busy, setBusy] = useState(false);
@@ -115,10 +117,15 @@ export function ActivitySidebar({
   }
 
   return (
-    <div className="win-window relative flex h-full flex-col">
-      <div className="win-titlebar">
+    <div className="win-window relative flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="win-titlebar sticky top-0 z-10">
         <span className="text-[13px] font-semibold tracking-tight">Moodle Review</span>
         <div className="flex gap-1">
+          {onCollapse ? (
+            <button className="win-button" onClick={onCollapse} aria-label="Collapse activity pane" title="Collapse pane">
+              &lt;
+            </button>
+          ) : null}
           <button
             className={`win-button ${selectMode ? "active" : ""}`}
             onClick={toggleSelectMode}

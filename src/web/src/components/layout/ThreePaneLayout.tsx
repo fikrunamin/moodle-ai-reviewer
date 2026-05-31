@@ -4,9 +4,34 @@ interface Props {
   left: ReactNode;
   center: ReactNode;
   right: ReactNode;
+  leftCollapsed?: boolean;
+  centerCollapsed?: boolean;
+  onToggleLeft?: () => void;
+  onToggleCenter?: () => void;
 }
 
-export function ThreePaneLayout({ left, center, right }: Props) {
+function CollapsedPaneRail({ label, onExpand }: { label: string; onExpand?: () => void }) {
+  return (
+    <button
+      className="win-window flex h-full w-full items-center justify-center text-[11px] font-semibold uppercase tracking-[0.18em] text-muted hover:text-secondary"
+      onClick={onExpand}
+      title={`Tampilkan ${label}`}
+      style={{ writingMode: "vertical-rl" }}
+    >
+      {label}
+    </button>
+  );
+}
+
+export function ThreePaneLayout({
+  left,
+  center,
+  right,
+  leftCollapsed = false,
+  centerCollapsed = false,
+  onToggleLeft,
+  onToggleCenter,
+}: Props) {
   const [leftWidth, setLeftWidth] = useState(18);
   const [centerWidth, setCenterWidth] = useState(18);
 
@@ -38,22 +63,34 @@ export function ThreePaneLayout({ left, center, right }: Props) {
     window.addEventListener("mouseup", onUp);
   };
 
-  const rightWidth = Math.max(32, 100 - leftWidth - centerWidth);
+  const leftColumn = leftCollapsed ? "44px" : `minmax(240px, ${leftWidth}%)`;
+  const centerColumn = centerCollapsed ? "44px" : `minmax(280px, ${centerWidth}%)`;
+  const leftResizerColumn = leftCollapsed || centerCollapsed ? "0px" : "4px";
+  const centerResizerColumn = centerCollapsed ? "0px" : "4px";
+  const columns = `${leftColumn} ${leftResizerColumn} ${centerColumn} ${centerResizerColumn} minmax(380px, 1fr)`;
 
   return (
     <main
-      className="win-app grid min-h-screen grid-cols-1 gap-2 p-2 lg:grid-cols-[minmax(240px,var(--left))_4px_minmax(280px,var(--center))_4px_minmax(380px,var(--right))]"
+      className="win-app grid h-screen min-h-0 grid-cols-1 gap-2 overflow-hidden p-2 lg:grid-cols-[var(--pane-cols)]"
       style={{
-        "--left": `${leftWidth}%`,
-        "--center": `${centerWidth}%`,
-        "--right": `${rightWidth}%`,
+        "--pane-cols": columns,
       } as CSSProperties}
     >
-      <aside className="min-w-0">{left}</aside>
-      <div className="win-resizer hidden cursor-col-resize lg:block" onMouseDown={startDrag("left")} />
-      <section className="min-w-0">{center}</section>
-      <div className="win-resizer hidden cursor-col-resize lg:block" onMouseDown={startDrag("center")} />
-      <section className="min-w-0">{right}</section>
+      <aside className="min-h-0 min-w-0 overflow-hidden lg:sticky lg:top-2 lg:h-[calc(100vh-1rem)]">
+        {leftCollapsed ? <CollapsedPaneRail label="Activity" onExpand={onToggleLeft} /> : left}
+      </aside>
+      <div
+        className={`win-resizer hidden cursor-col-resize lg:block ${leftCollapsed || centerCollapsed ? "pointer-events-none opacity-0" : ""}`}
+        onMouseDown={startDrag("left")}
+      />
+      <section className="min-h-0 min-w-0 overflow-hidden lg:sticky lg:top-2 lg:h-[calc(100vh-1rem)]">
+        {centerCollapsed ? <CollapsedPaneRail label="Mahasiswa" onExpand={onToggleCenter} /> : center}
+      </section>
+      <div
+        className={`win-resizer hidden cursor-col-resize lg:block ${centerCollapsed ? "pointer-events-none opacity-0" : ""}`}
+        onMouseDown={startDrag("center")}
+      />
+      <section className="min-h-0 min-w-0 overflow-hidden lg:sticky lg:top-2 lg:h-[calc(100vh-1rem)]">{right}</section>
     </main>
   );
 }

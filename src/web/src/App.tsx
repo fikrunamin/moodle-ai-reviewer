@@ -24,6 +24,8 @@ export function App() {
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [centerCollapsed, setCenterCollapsed] = useState(false);
 
   const refreshActivities = () => {
     apiGet<Activity[]>("/api/activities").then(setActivities).catch(() => setActivities([]));
@@ -48,6 +50,10 @@ export function App() {
   return (
     <>
       <ThreePaneLayout
+        leftCollapsed={leftCollapsed}
+        centerCollapsed={centerCollapsed}
+        onToggleLeft={() => setLeftCollapsed((current) => !current)}
+        onToggleCenter={() => setCenterCollapsed((current) => !current)}
         left={
           <ActivitySidebar
             activities={activities}
@@ -63,6 +69,7 @@ export function App() {
             }}
             onOpenSettings={() => setSettingsOpen(true)}
             onDeleteActivities={deleteActivities}
+            onCollapse={() => setLeftCollapsed(true)}
           />
         }
         center={
@@ -73,6 +80,7 @@ export function App() {
             onStudentsDeleted={(ids) => {
               if (selectedStudentId && ids.includes(selectedStudentId)) setSelectedStudentId(null);
             }}
+            onCollapse={() => setCenterCollapsed(true)}
           />
         }
         right={<AssessmentDetailPanel studentId={selectedStudentId} activityType={selectedActivity?.type ?? null} />}

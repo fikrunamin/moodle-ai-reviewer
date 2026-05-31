@@ -332,21 +332,23 @@ export function AssessmentDetailPanel({
 
   if (!studentId) {
     return (
-      <div className="win-window flex h-full flex-col">
+      <div className="win-window flex h-full min-h-0 flex-col overflow-hidden">
         <div className="win-titlebar">Preview</div>
-        <p className="m-3 text-secondary">Pilih mahasiswa untuk melihat review.</p>
+        <div className="win-scroll min-h-0 flex-1 overflow-y-auto p-3">
+          <p className="text-secondary">Pilih mahasiswa untuk melihat review.</p>
+        </div>
       </div>
     );
   }
 
   const type = detail?.activity.type ?? activityType;
   const panelClass = fullscreen
-    ? "win-window win-scroll fixed inset-2 z-50 flex flex-col overflow-y-auto shadow-2xl"
-    : "win-window win-scroll flex h-full flex-col overflow-y-auto";
+    ? "win-window fixed inset-2 z-50 flex min-h-0 flex-col overflow-hidden shadow-2xl"
+    : "win-window flex h-full min-h-0 flex-col overflow-hidden";
 
   return (
     <div className={panelClass}>
-      <div className="win-titlebar sticky top-0 z-10">
+      <div className="win-titlebar z-10">
         <div className="min-w-0">
           <h2 className="truncate text-[13px] font-semibold">{detail?.student.student_name ?? "Assessment"}</h2>
           <p className="truncate text-[11px] text-muted">{type ?? "No activity selected"}</p>
@@ -360,7 +362,7 @@ export function AssessmentDetailPanel({
           </button>
         </div>
       </div>
-      <div className="grid gap-3 p-3">
+      <div className="win-scroll grid min-h-0 flex-1 gap-3 overflow-y-auto p-3">
         {generateStatus ? <p className="win-status">{generateStatus}</p> : null}
         {assessment?.is_obsolete ? (
           <p className="win-status text-warn">

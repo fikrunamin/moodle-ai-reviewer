@@ -3,7 +3,7 @@ import { paths } from "../runtime/paths";
 import { findChromeExecutable } from "./chrome-finder";
 import { AppError } from "../shared/errors";
 
-export async function launchBrowser(): Promise<Browser> {
+export async function launchBrowser(options: { headless?: boolean } = {}): Promise<Browser> {
   const executablePath = findChromeExecutable();
 
   if (!executablePath) {
@@ -12,7 +12,7 @@ export async function launchBrowser(): Promise<Browser> {
 
   return puppeteer.launch({
     executablePath,
-    headless: process.env.PUPPETEER_HEADLESS !== "false",
+    headless: options.headless ?? process.env.PUPPETEER_HEADLESS !== "false",
     userDataDir: paths.sessions,
     args: ["--no-first-run", "--no-default-browser-check"],
   });

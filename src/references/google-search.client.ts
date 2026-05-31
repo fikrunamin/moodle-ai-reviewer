@@ -79,6 +79,23 @@ export async function searchGoogleReference(query: string): Promise<GoogleRefere
     hl: "en",
   }).toString()}`;
 
+  const browserHit = await searchGoogleReferenceWithBrowser(searchUrl).catch((error) => {
+    logger.warn("Google browser reference search failed", error);
+    return null;
+  });
+  if (browserHit && (browserHit.pdfUrls.length || browserHit.landingUrls.length || browserHit.doi) && !browserHit.blocked) {
+    return browserHit;
+  }
+
+  const fetchHit = await searchGoogleReferenceWithFetch(searchUrl).catch((error) => {
+    logger.warn("Google reference search failed", error);
+    return null;
+  });
+  return fetchHit ?? browserHit;
+}
+
+async function searchGoogleReferenceWithFetch(searchUrl: string): Promise<GoogleReferenceSearchHit | null> {
+  if (process.env.REFERENCE_GOOGLE_FETCH_FALLBACK_ENABLED === "false") return null;
   try {
     const response = await fetch(searchUrl, {
       headers: {
@@ -94,25 +111,16 @@ export async function searchGoogleReference(query: string): Promise<GoogleRefere
     const hrefs = Array.from(html.matchAll(/<a\s+[^>]*href=["']([^"']+)["']/gi)).map((match) => match[1]);
     const urls = unique(hrefs.map(extractGoogleTarget)).filter((url) => !isGoogleInternal(url));
     const hit = makeHit({ searchUrl, htmlOrText: html, urls, blocked });
-    if ((hit.pdfUrls.length || hit.landingUrls.length || hit.doi) && !hit.blocked) return hit;
-
-    const browserHit = await searchGoogleReferenceWithBrowser(searchUrl).catch((error) => {
-      logger.warn("Google browser reference search failed", error);
-      return null;
-    });
-    return browserHit ?? hit;
+    return hit;
   } catch (error) {
-    logger.warn("Google reference search failed", error);
-    return searchGoogleReferenceWithBrowser(searchUrl).catch((browserError) => {
-      logger.warn("Google browser reference search failed", browserError);
-      return null;
-    });
+    logger.warn("Google fetch reference search failed", error);
+    return null;
   }
 }
 
 async function searchGoogleReferenceWithBrowser(searchUrl: string): Promise<GoogleReferenceSearchHit | null> {
   if (process.env.REFERENCE_GOOGLE_BROWSER_SEARCH_ENABLED === "false") return null;
-  const browser = await launchBrowser();
+  const browser = await launchBrowser({ headless: true });
   try {
     const page = await browser.newPage();
     await page.goto(searchUrl, {

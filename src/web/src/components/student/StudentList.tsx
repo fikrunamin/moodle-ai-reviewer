@@ -20,9 +20,10 @@ interface Props {
   selectedStudentId: string | null;
   onSelectStudent: (id: string) => void;
   onStudentsDeleted?: (ids: string[]) => void;
+  onCollapse?: () => void;
 }
 
-export function StudentList({ activityId, selectedStudentId, onSelectStudent, onStudentsDeleted }: Props) {
+export function StudentList({ activityId, selectedStudentId, onSelectStudent, onStudentsDeleted, onCollapse }: Props) {
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
@@ -96,10 +97,17 @@ export function StudentList({ activityId, selectedStudentId, onSelectStudent, on
   }
 
   return (
-    <div className="win-window relative flex h-full flex-col">
-      <div className="win-titlebar">
+    <div className="win-window relative flex h-full min-h-0 flex-col overflow-hidden">
+      <div className="win-titlebar sticky top-0 z-10">
         <span className="text-[13px] font-semibold tracking-tight">Mahasiswa</span>
-        <span className="text-[11px] text-muted">{students.length} records</span>
+        <div className="flex items-center gap-1">
+          <span className="text-[11px] text-muted">{students.length} records</span>
+          {onCollapse ? (
+            <button className="win-button" onClick={onCollapse} aria-label="Collapse student pane" title="Collapse pane">
+              &lt;
+            </button>
+          ) : null}
+        </div>
       </div>
       <div className="grid gap-2 p-2">
         <div className="grid gap-1 xl:grid-cols-[1fr_140px]">
