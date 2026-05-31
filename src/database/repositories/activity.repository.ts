@@ -78,4 +78,51 @@ export class ActivityRepository {
       )
       .run(text, id);
   }
+
+  delete(id: string) {
+    this.deleteMany([id]);
+  }
+
+  deleteMany(ids: string[]) {
+    if (ids.length === 0) return 0;
+    const db = getDb();
+    const placeholders = ids.map(() => "?").join(", ");
+    const tx = db.transaction(() => {
+      // PDF enrichment data keyed by submission
+      db.query(
+        `DELETE FROM pdf_summaries WHERE file_id IN (
+           SELECT f.id FROM moodle_submission_files f
+           JOIN moodle_submissions s ON s.id = f.submission_id
+           WHERE s.activity_id IN (${placeholders})
+         )`,
+      ).run(...ids);
+      db.query(
+        `DELETE FROM extracted_links WHERE submission_id IN (
+           SELECT id FROM moodle_submissions WHERE activity_id IN (${placeholders})
+         )`,
+      ).run(...ids);
+      db.query(
+        `DELETE FROM extracted_references WHERE submission_id IN (
+           SELECT id FROM moodle_submissions WHERE activity_id IN (${placeholders})
+         )`,
+      ).run(...ids);
+      db.query(
+        `DELETE FROM moodle_submission_files WHERE submission_id IN (
+           SELECT id FROM moodle_submissions WHERE activity_id IN (${placeholders})
+         )`,
+      ).run(...ids);
+      db.query(`DELETE FROM moodle_submissions WHERE activity_id IN (${placeholders})`).run(...ids);
+      db.query(`DELETE FROM moodle_discussion_posts WHERE activity_id IN (${placeholders})`).run(...ids);
+      db.query(
+        `DELETE FROM ai_assessment_scores WHERE assessment_id IN (
+           SELECT id FROM ai_assessments WHERE activity_id IN (${placeholders})
+         )`,
+      ).run(...ids);
+      db.query(`DELETE FROM ai_assessments WHERE activity_id IN (${placeholders})`).run(...ids);
+      db.query(`DELETE FROM moodle_students WHERE activity_id IN (${placeholders})`).run(...ids);
+      db.query(`DELETE FROM moodle_activities WHERE id IN (${placeholders})`).run(...ids);
+    });
+    tx();
+    return ids.length;
+  }
 }

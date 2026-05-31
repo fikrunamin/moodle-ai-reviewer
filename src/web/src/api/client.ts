@@ -28,3 +28,12 @@ export async function apiPostForm<T>(path: string, body: FormData): Promise<T> {
   }
   return response.json() as Promise<T>;
 }
+
+export async function apiDelete<T>(path: string): Promise<T> {
+  const response = await fetch(path, { method: "DELETE" });
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || `Request failed: ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "../../api/client";
 import { StudentItem } from "./StudentItem";
 import { BulkActionBar } from "./BulkActionBar";
+import { ConfirmDialog } from "../layout/ConfirmDialog";
 
 interface Student {
   id: string;
@@ -16,15 +17,18 @@ interface Props {
   activityId: string | null;
   selectedStudentId: string | null;
   onSelectStudent: (id: string) => void;
+  onStudentsDeleted?: (ids: string[]) => void;
 }
 
-export function StudentList({ activityId, selectedStudentId, onSelectStudent }: Props) {
+export function StudentList({ activityId, selectedStudentId, onSelectStudent, onStudentsDeleted }: Props) {
   const [students, setStudents] = useState<Student[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [jobStatus, setJobStatus] = useState<{ running: boolean; queued: number; pending: number } | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const refresh = () => {
     if (!activityId) {
@@ -74,8 +78,23 @@ export function StudentList({ activityId, selectedStudentId, onSelectStudent }: 
     refresh();
   }
 
+  async function confirmDelete() {
+    if (selectedIds.length === 0) return;
+    setDeleting(true);
+    try {
+      await apiPost("/api/students/delete-bulk", { studentIds: selectedIds, activityId });
+      onStudentsDeleted?.(selectedIds);
+      setSelectedIds([]);
+      setConfirmOpen(false);
+      setMessage(`${selectedIds.length} mahasiswa dihapus dari aplikasi`);
+      refresh();
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
-    <div className="win-window flex h-full flex-col">
+    <div className="win-window relative flex h-full flex-col">
       <div className="win-titlebar">
         <span className="text-[13px] font-semibold tracking-tight">Mahasiswa</span>
         <span className="text-[11px] text-muted">{students.length} records</span>
@@ -131,7 +150,7 @@ export function StudentList({ activityId, selectedStudentId, onSelectStudent }: 
           </p>
         ) : null}
       </div>
-      <div className="win-scroll mx-2 mb-2 grid min-h-0 flex-1 content-start gap-1 overflow-y-auto">
+      <div className={`win-scroll mx-2 grid min-h-0 flex-1 content-start gap-1 overflow-y-auto ${selectedIds.length > 0 ? "mb-16" : "mb-2"}`}>
         {filtered.length === 0 ? (
           <p className="px-1 text-[11.5px] text-muted">Pilih activity untuk melihat mahasiswa.</p>
         ) : (
@@ -153,6 +172,34 @@ export function StudentList({ activityId, selectedStudentId, onSelectStudent }: 
           ))
         )}
       </div>
+
+      {selectedIds.length > 0 ? (
+        <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 border-t divider bg-[var(--bg-surface)]/95 p-2 backdrop-blur">
+          <span className="text-[12px] text-secondary">{selectedIds.length} dipilih</span>
+          <div className="flex gap-1">
+            <button className="win-button" onClick={() => setSelectedIds([])}>
+              Bersihkan
+            </button>
+            <button
+              className="win-button"
+              style={{ background: "var(--danger)", borderColor: "var(--danger)", color: "#1a0b0b" }}
+              onClick={() => setConfirmOpen(true)}
+            >
+              Hapus {selectedIds.length}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      <ConfirmDialog
+        open={confirmOpen}
+        title="Hapus mahasiswa"
+        message={`Hapus ${selectedIds.length} mahasiswa beserta submission dan review-nya dari APLIKASI INI saja. Data di Moodle tidak tersentuh. Lanjutkan?`}
+        confirmLabel={`Hapus ${selectedIds.length}`}
+        busy={deleting}
+        onConfirm={confirmDelete}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>
   );
 }

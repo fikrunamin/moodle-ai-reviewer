@@ -4,7 +4,7 @@ import { ActivitySidebar } from "./components/activity/ActivitySidebar";
 import { StudentList } from "./components/student/StudentList";
 import { AssessmentDetailPanel } from "./components/assessment/AssessmentDetailPanel";
 import { AISettingsModal } from "./components/settings/AISettingsModal";
-import { apiGet } from "./api/client";
+import { apiGet, apiPost } from "./api/client";
 
 interface Activity {
   id: string;
@@ -33,6 +33,16 @@ export function App() {
     refreshActivities();
   }, []);
 
+  const deleteActivities = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    await apiPost("/api/activities/delete-bulk", { activityIds: ids });
+    if (selectedActivityId && ids.includes(selectedActivityId)) {
+      setSelectedActivityId(null);
+      setSelectedStudentId(null);
+    }
+    refreshActivities();
+  };
+
   const selectedActivity = activities.find((activity) => activity.id === selectedActivityId) ?? null;
 
   return (
@@ -52,6 +62,7 @@ export function App() {
               setSelectedActivityId(activity.id);
             }}
             onOpenSettings={() => setSettingsOpen(true)}
+            onDeleteActivities={deleteActivities}
           />
         }
         center={
@@ -59,6 +70,9 @@ export function App() {
             activityId={selectedActivityId}
             selectedStudentId={selectedStudentId}
             onSelectStudent={setSelectedStudentId}
+            onStudentsDeleted={(ids) => {
+              if (selectedStudentId && ids.includes(selectedStudentId)) setSelectedStudentId(null);
+            }}
           />
         }
         right={<AssessmentDetailPanel studentId={selectedStudentId} activityType={selectedActivity?.type ?? null} />}

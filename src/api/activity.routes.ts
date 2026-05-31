@@ -63,6 +63,25 @@ export function registerActivityRoutes(app: Hono) {
   app.get("/api/jobs/sync", (c) => c.json(syncQueue.getStatus()));
   app.get("/api/jobs/rubric", (c) => c.json(rubricQueue.getStatus()));
 
+  // Bulk delete activities (and all local data under them).
+  app.post("/api/activities/delete-bulk", async (c) => {
+    const parsed = z
+      .object({ activityIds: z.array(z.string()).min(1) })
+      .safeParse(await c.req.json().catch(() => ({})));
+    if (!parsed.success) return c.json({ error: "activityIds wajib diisi" }, 400);
+    const deleted = new ActivityRepository().deleteMany(parsed.data.activityIds);
+    return c.json({ deleted });
+  });
+
+  // Single delete activity.
+  app.delete("/api/activities/:activityId", (c) => {
+    const activityId = c.req.param("activityId");
+    const activity = new ActivityRepository().find(activityId);
+    if (!activity) return c.json({ error: "Activity not found" }, 404);
+    new ActivityRepository().delete(activityId);
+    return c.json({ deleted: 1 });
+  });
+
   app.post("/api/activities/:activityId/rubric", async (c) => {
     const activityId = c.req.param("activityId");
     const activity = new ActivityRepository().find(activityId);

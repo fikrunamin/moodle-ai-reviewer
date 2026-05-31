@@ -81,9 +81,19 @@ export class MoodleAssignmentScraper {
       return rows
         .map((row) => {
           const rowText = text(row);
+          // Moodle grading table: the student name lives in the c2 cell.
+          const nameCell = row.querySelector("td.cell.c2");
           const nameLink = row.querySelector("a[href*='user/view'], a[href*='profile']");
-          const studentName = text(nameLink) || text(row.querySelector("td")) || "";
-          const email = rowText.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] ?? null;
+          const studentName =
+            text(nameCell?.querySelector("a") ?? null) ||
+            text(nameCell) ||
+            text(nameLink) ||
+            text(row.querySelector("td")) ||
+            "";
+          const email =
+            text(row.querySelector("td.cell.c3")) ||
+            rowText.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] ||
+            null;
           const pdfUrls = Array.from(row.querySelectorAll("a[href]"))
             .map((link) => {
               const anchor = link as HTMLAnchorElement;
@@ -97,7 +107,7 @@ export class MoodleAssignmentScraper {
           if (!studentName || studentName.length < 2) return null;
           return {
             studentName,
-            email,
+            email: email && /@/.test(email) ? email : null,
             submissionStatus: rowText.includes("Submitted") || rowText.includes("Terkirim") ? "submitted" : "unknown",
             submissionText: rowText,
             submittedAt: null,

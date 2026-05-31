@@ -1,10 +1,33 @@
 import type { Hono } from "hono";
+import { z } from "zod";
 import { StudentRepository } from "../database/repositories/student.repository";
 import { getDb } from "../database/db";
+import { ActivityRepository } from "../database/repositories/activity.repository";
 
 export function registerStudentRoutes(app: Hono) {
   app.get("/api/activities/:activityId/students", (c) => {
     return c.json(new StudentRepository().listByActivity(c.req.param("activityId")));
+  });
+
+  // App-only bulk delete. Does NOT delete anything in Moodle.
+  app.post("/api/students/delete-bulk", async (c) => {
+    const parsed = z
+      .object({ studentIds: z.array(z.string()).min(1), activityId: z.string().optional() })
+      .safeParse(await c.req.json().catch(() => ({})));
+    if (!parsed.success) return c.json({ error: "studentIds wajib diisi" }, 400);
+    const deleted = new StudentRepository().deleteMany(parsed.data.studentIds);
+    if (parsed.data.activityId) new ActivityRepository().refreshCounts(parsed.data.activityId);
+    return c.json({ deleted });
+  });
+
+  // App-only single delete.
+  app.delete("/api/students/:studentId", (c) => {
+    const studentId = c.req.param("studentId");
+    const student = new StudentRepository().find(studentId);
+    if (!student) return c.json({ error: "Student not found" }, 404);
+    new StudentRepository().deleteMany([studentId]);
+    new ActivityRepository().refreshCounts(student.activity_id);
+    return c.json({ deleted: 1 });
   });
 
   app.get("/api/students/:studentId/detail", (c) => {
