@@ -49,7 +49,7 @@ export function AISettingsModal({ onClose }: Props) {
   const payload = { providerName, baseUrl, apiKey: apiKey.trim() || undefined, modelName };
 
   async function testConnection() {
-    setStatus("Testing...");
+    setStatus("Testing…");
     try {
       await apiPost("/api/ai-settings/test", payload);
       setStatus("Connection OK");
@@ -59,7 +59,7 @@ export function AISettingsModal({ onClose }: Props) {
   }
 
   async function save() {
-    setStatus("Saving...");
+    setStatus("Saving…");
     await apiPost("/api/ai-settings", payload);
     setApiKey("");
     setStatus("Saved");
@@ -68,7 +68,7 @@ export function AISettingsModal({ onClose }: Props) {
   async function saveCookies() {
     if (!moodleBaseUrl || !cookies) return;
     setBusy(true);
-    setSessionStatus("Saving cookies...");
+    setSessionStatus("Saving cookies…");
     try {
       const result = await apiPost<{ count: number }>("/api/moodle/cookies", {
         baseUrl: moodleBaseUrl,
@@ -86,13 +86,20 @@ export function AISettingsModal({ onClose }: Props) {
   async function testCookies() {
     if (!moodleBaseUrl) return;
     setBusy(true);
-    setSessionStatus("Testing session...");
+    setSessionStatus("Testing session…");
     try {
-      const result = await apiPost<{ ok: boolean; cookie_count: number; login_required: boolean }>("/api/moodle/cookies/test", {
-        baseUrl: moodleBaseUrl,
-        cookies: cookies.trim() || undefined,
-      });
-      setSessionStatus(result.ok ? `Session OK (${result.cookie_count} cookies)` : "Session belum valid atau masih diarahkan ke login");
+      const result = await apiPost<{ ok: boolean; cookie_count: number; login_required: boolean }>(
+        "/api/moodle/cookies/test",
+        {
+          baseUrl: moodleBaseUrl,
+          cookies: cookies.trim() || undefined,
+        },
+      );
+      setSessionStatus(
+        result.ok
+          ? `Session OK (${result.cookie_count} cookies)`
+          : "Session belum valid atau diarahkan ke login",
+      );
     } catch (error) {
       setSessionStatus(error instanceof Error ? error.message : "Failed to test session");
     } finally {
@@ -102,11 +109,11 @@ export function AISettingsModal({ onClose }: Props) {
 
   async function checkUpdate() {
     setBusy(true);
-    setUpdateStatus("Checking update...");
+    setUpdateStatus("Checking update…");
     try {
       const result = await apiGet<typeof updateInfo>("/api/update/check");
       setUpdateInfo(result);
-      setUpdateStatus(result?.updateAvailable ? "Update available" : "Already on latest version");
+      setUpdateStatus(result?.updateAvailable ? "Update tersedia" : "Sudah versi terbaru");
     } catch (error) {
       setUpdateStatus(error instanceof Error ? error.message : "Update check failed");
     } finally {
@@ -116,7 +123,7 @@ export function AISettingsModal({ onClose }: Props) {
 
   async function openLatestRelease() {
     setBusy(true);
-    setUpdateStatus("Opening release page...");
+    setUpdateStatus("Opening release page…");
     try {
       const result = await apiPost<typeof updateInfo>("/api/update/open-latest");
       setUpdateInfo(result);
@@ -130,7 +137,7 @@ export function AISettingsModal({ onClose }: Props) {
 
   async function applyUpdate() {
     setBusy(true);
-    setUpdateStatus("Downloading update...");
+    setUpdateStatus("Downloading update…");
     try {
       const result = await apiPost<typeof updateInfo & { message?: string }>("/api/update/apply");
       setUpdateInfo(result);
@@ -142,48 +149,56 @@ export function AISettingsModal({ onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="win-modal w-full max-w-3xl">
         <div className="win-titlebar">
-          <h2 className="font-semibold">Settings</h2>
+          <h2 className="text-[13px] font-semibold">Settings</h2>
           <button className="win-button" onClick={onClose} aria-label="Close settings">
-            ❌
+            ✕
           </button>
         </div>
 
         <div className="grid min-h-[460px] grid-cols-[180px_1fr]">
-          <aside className="p-2">
+          <aside className="grid content-start gap-1 border-r divider p-2">
             <button
               className={`win-tab w-full ${activeTab === "ai" ? "active" : ""}`}
               onClick={() => setActiveTab("ai")}
             >
-              🤖 AI Provider
+              AI Provider
             </button>
             <button
-              className={`win-tab mt-1 w-full ${activeTab === "moodle" ? "active" : ""}`}
+              className={`win-tab w-full ${activeTab === "moodle" ? "active" : ""}`}
               onClick={() => setActiveTab("moodle")}
             >
-              🍪 Moodle Cookies
+              Moodle Cookies
             </button>
             <button
-              className={`win-tab mt-1 w-full ${activeTab === "update" ? "active" : ""}`}
+              className={`win-tab w-full ${activeTab === "update" ? "active" : ""}`}
               onClick={() => setActiveTab("update")}
             >
-              ⬆️ Update
+              Update
             </button>
           </aside>
 
-          <section className="win-inset m-2 flex flex-col">
+          <section className="flex flex-col">
             {activeTab === "ai" ? (
               <>
-                <div className="grid gap-2 p-2">
+                <div className="grid gap-3 p-3">
                   <label className="win-field">
                     Provider Name
-                    <input className="win-input" value={providerName} onChange={(event) => setProviderName(event.target.value)} />
+                    <input
+                      className="win-input"
+                      value={providerName}
+                      onChange={(event) => setProviderName(event.target.value)}
+                    />
                   </label>
                   <label className="win-field">
                     Base URL
-                    <input className="win-input" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} />
+                    <input
+                      className="win-input"
+                      value={baseUrl}
+                      onChange={(event) => setBaseUrl(event.target.value)}
+                    />
                   </label>
                   <label className="win-field">
                     API Key
@@ -194,25 +209,37 @@ export function AISettingsModal({ onClose }: Props) {
                       value={apiKey}
                       onChange={(event) => setApiKey(event.target.value)}
                     />
-                    <span className="text-xs text-slate-500">Stored locally as plain text in SQLite.</span>
+                    <span className="text-[11px] text-muted">
+                      Disimpan lokal sebagai plain text di SQLite.
+                    </span>
                   </label>
                   <label className="win-field">
                     Model Name
-                    <input className="win-input" value={modelName} onChange={(event) => setModelName(event.target.value)} />
+                    <input
+                      className="win-input"
+                      value={modelName}
+                      onChange={(event) => setModelName(event.target.value)}
+                    />
                   </label>
                   {status ? <p className="win-status">{status}</p> : null}
                 </div>
-                <div className="mt-auto flex justify-end gap-1 p-2">
-                  <button className="win-button" onClick={testConnection}>🔌 Test Connection</button>
-                  <button className="win-button" onClick={save}>💾 Save</button>
+                <div className="mt-auto flex justify-end gap-1 border-t divider p-3">
+                  <button className="win-button" onClick={testConnection}>
+                    Test connection
+                  </button>
+                  <button className="win-button win-button-primary" onClick={save}>
+                    Save
+                  </button>
                 </div>
               </>
             ) : activeTab === "moodle" ? (
               <>
-                <div className="grid gap-2 p-2">
+                <div className="grid gap-3 p-3">
                   <div>
-                    <h3 className="font-medium">Moodle Session Cookies</h3>
-                    <p>Paste Cookie-Editor JSON export atau raw Cookie header dari domain Moodle.</p>
+                    <h3 className="text-[12.5px] font-semibold">Moodle Session Cookies</h3>
+                    <p className="text-[11.5px] text-muted">
+                      Paste Cookie-Editor JSON export atau raw Cookie header dari domain Moodle.
+                    </p>
                   </div>
                   <label className="win-field">
                     Moodle Base URL
@@ -227,65 +254,107 @@ export function AISettingsModal({ onClose }: Props) {
                     Cookies JSON / Header
                     <textarea
                       className="win-textarea min-h-56 resize-y font-mono"
-                      placeholder='Paste Cookie-Editor JSON export, JSON cookies array, or raw Cookie header: MoodleSession=...; MOODLEID1_=...'
+                      placeholder='Paste Cookie-Editor JSON export, JSON cookies array, or raw Cookie header'
                       value={cookies}
                       onChange={(event) => setCookies(event.target.value)}
                     />
                   </label>
                   {sessionStatus ? <p className="win-status">{sessionStatus}</p> : null}
                 </div>
-                <div className="mt-auto flex justify-end gap-1 p-2">
-                  <button className="win-button" disabled={busy || !moodleBaseUrl} onClick={testCookies}>
-                    🧪 Test Session
+                <div className="mt-auto flex justify-end gap-1 border-t divider p-3">
+                  <button
+                    className="win-button"
+                    disabled={busy || !moodleBaseUrl}
+                    onClick={testCookies}
+                  >
+                    Test session
                   </button>
-                  <button className="win-button" disabled={busy || !moodleBaseUrl || !cookies} onClick={saveCookies}>
-                    💾 Save Cookies
+                  <button
+                    className="win-button win-button-primary"
+                    disabled={busy || !moodleBaseUrl || !cookies}
+                    onClick={saveCookies}
+                  >
+                    Save cookies
                   </button>
                 </div>
               </>
             ) : (
               <>
-                <div className="grid gap-2 p-2">
+                <div className="grid gap-3 p-3">
                   <div>
-                    <h3 className="font-medium">Application Update</h3>
-                    <p>Cek release terbaru dari GitHub dan download paket terbaru secara manual.</p>
+                    <h3 className="text-[12.5px] font-semibold">Application Update</h3>
+                    <p className="text-[11.5px] text-muted">
+                      Cek release terbaru dari GitHub dan download paket terbaru.
+                    </p>
                   </div>
                   {updateInfo ? (
-                    <div className="win-inset grid gap-1 p-2">
-                      <p>Repo: {updateInfo.repository}</p>
-                      <p>Current: v{updateInfo.currentVersion}</p>
-                      <p>Latest: v{updateInfo.latestVersion}</p>
-                      <p>Status: {updateInfo.updateAvailable ? "Update tersedia" : "Sudah versi terbaru"}</p>
+                    <div className="win-inset grid gap-1 p-3 text-[12px]">
+                      <p className="text-muted">Repo</p>
+                      <p className="font-mono">{updateInfo.repository}</p>
+                      <div className="flex gap-6 pt-1">
+                        <div>
+                          <p className="text-muted">Current</p>
+                          <p>v{updateInfo.currentVersion}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted">Latest</p>
+                          <p>v{updateInfo.latestVersion}</p>
+                        </div>
+                        <div>
+                          <p className="text-muted">Status</p>
+                          <p className={updateInfo.updateAvailable ? "text-warn" : "text-success"}>
+                            {updateInfo.updateAvailable ? "Tersedia" : "Terbaru"}
+                          </p>
+                        </div>
+                      </div>
                       {updateInfo.recommendedAsset ? (
-                        <p>Asset: {updateInfo.recommendedAsset.name}</p>
+                        <p className="pt-1 text-muted">Asset: {updateInfo.recommendedAsset.name}</p>
                       ) : (
-                        <p>Asset: belum ada downloadable asset.</p>
+                        <p className="pt-1 text-muted">Asset: belum ada downloadable.</p>
                       )}
                     </div>
                   ) : (
-                    <div className="win-inset p-2">Belum dicek.</div>
+                    <div className="win-inset p-3 text-muted">Belum dicek.</div>
                   )}
                   {updateStatus ? <p className="win-status">{updateStatus}</p> : null}
                 </div>
-                <div className="mt-auto flex justify-end gap-1 p-2">
+                <div className="mt-auto flex flex-wrap justify-end gap-1 border-t divider p-3">
                   {updateInfo?.recommendedAsset ? (
-                    <a className="win-button" href={updateInfo.recommendedAsset.url} target="_blank" rel="noreferrer">
-                      📦 Download Asset
+                    <a
+                      className="win-button"
+                      href={updateInfo.recommendedAsset.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Download asset
                     </a>
                   ) : null}
                   {updateInfo ? (
-                    <a className="win-button" href={updateInfo.releaseUrl} target="_blank" rel="noreferrer">
-                      🌐 Release Page
+                    <a
+                      className="win-button"
+                      href={updateInfo.releaseUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Release page
                     </a>
                   ) : null}
                   <button className="win-button" disabled={busy} onClick={openLatestRelease}>
-                    🚀 Open Latest
+                    Open latest
                   </button>
-                  <button className="win-button" disabled={busy || !updateInfo?.updateAvailable || !updateInfo?.recommendedAsset} onClick={applyUpdate}>
-                    ⚙️ Self Update
+                  <button
+                    className="win-button"
+                    disabled={busy || !updateInfo?.updateAvailable || !updateInfo?.recommendedAsset}
+                    onClick={applyUpdate}
+                  >
+                    Self update
                   </button>
-                  <button className="win-button" disabled={busy} onClick={checkUpdate}>
-                    🔎 Check Update
+                  <button
+                    className="win-button win-button-primary"
+                    disabled={busy}
+                    onClick={checkUpdate}
+                  >
+                    Check update
                   </button>
                 </div>
               </>

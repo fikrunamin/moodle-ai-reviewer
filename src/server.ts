@@ -18,13 +18,17 @@ function contentType(filePath: string) {
   return "application/octet-stream";
 }
 
-export function startServer(port: number) {
+export function createApiApp() {
   const app = new Hono();
-
   app.use("*", cors());
   app.get("/health", (c) => c.json({ ok: true }));
-
   registerRoutes(app);
+  return app;
+}
+
+export function createApp() {
+  const app = createApiApp();
+
   app.get("*", async (c) => {
     const requestPath = new URL(c.req.url).pathname;
     const relativePath = requestPath === "/" ? "index.html" : requestPath.slice(1);
@@ -46,6 +50,12 @@ export function startServer(port: number) {
 
     return c.text("Moodle AI Review Assistant API is running. Build the web app to serve UI.", 200);
   });
+
+  return app;
+}
+
+export function startServer(port: number) {
+  const app = createApp();
 
   const server = Bun.serve({
     port,

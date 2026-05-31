@@ -15,7 +15,9 @@ interface Props {
 }
 
 export function EditRubricModal({ activity, onClose, onUpdated }: Props) {
-  const [rubricText, setRubricText] = useState(activity.rubric_ai_json || activity.rubric_extracted_text || "");
+  const [rubricText, setRubricText] = useState(
+    activity.rubric_ai_json || activity.rubric_extracted_text || "",
+  );
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -27,7 +29,7 @@ export function EditRubricModal({ activity, onClose, onUpdated }: Props) {
       const form = new FormData();
       form.set("rubricText", rubricText);
       await apiPostForm(`/api/activities/${activity.id}/rubric`, form);
-      setMessage("Rubrik text saved.");
+      setMessage("Rubrik tersimpan.");
       onUpdated();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Failed to save rubric");
@@ -44,7 +46,7 @@ export function EditRubricModal({ activity, onClose, onUpdated }: Props) {
       const form = new FormData();
       form.set("rubricFile", file);
       await apiPostForm(`/api/activities/${activity.id}/rubric`, form);
-      setMessage("Rubrik upload queued.");
+      setMessage("Rubrik upload diproses.");
       onUpdated();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Failed to upload rubric");
@@ -54,30 +56,51 @@ export function EditRubricModal({ activity, onClose, onUpdated }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="win-modal w-full max-w-3xl">
         <div className="win-titlebar">
-          <h2>Edit Rubrik</h2>
-          <button className="win-button" onClick={onClose}>❌</button>
+          <h2 className="text-[13px] font-semibold">Edit Rubrik</h2>
+          <button className="win-button" onClick={onClose}>
+            ✕
+          </button>
         </div>
-        <div className="grid gap-2 p-2">
-          <p className="win-status">{activity.title}</p>
+        <div className="grid gap-3 p-3">
+          <p className="win-status text-muted">{activity.title}</p>
           <label className="win-field">
             Upload PDF baru
-            <input className="win-input" type="file" accept="application/pdf,.pdf" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+            <input
+              className="win-input"
+              type="file"
+              accept="application/pdf,.pdf"
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            />
           </label>
           <div className="flex justify-end">
-            <button className="win-button" disabled={busy || !file} onClick={uploadFile}>📄 Upload & Process Background</button>
+            <button className="win-button" disabled={busy || !file} onClick={uploadFile}>
+              Upload & process
+            </button>
           </div>
           <label className="win-field">
-            Edit Rubrik Manual
-            <textarea className="win-textarea min-h-72 resize-y font-mono" value={rubricText} onChange={(event) => setRubricText(event.target.value)} />
+            Edit rubrik manual
+            <textarea
+              className="win-textarea min-h-72 resize-y font-mono"
+              value={rubricText}
+              onChange={(event) => setRubricText(event.target.value)}
+            />
           </label>
           {message ? <p className="win-status">{message}</p> : null}
         </div>
-        <div className="flex justify-end gap-1 p-2">
-          <button className="win-button" onClick={onClose}>Close</button>
-          <button className="win-button" disabled={busy || !rubricText.trim()} onClick={saveText}>💾 Save Text</button>
+        <div className="flex justify-end gap-1 border-t divider p-3">
+          <button className="win-button" onClick={onClose}>
+            Close
+          </button>
+          <button
+            className="win-button win-button-primary"
+            disabled={busy || !rubricText.trim()}
+            onClick={saveText}
+          >
+            Save text
+          </button>
         </div>
       </div>
     </div>

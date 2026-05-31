@@ -48,37 +48,61 @@ export function AddActivityModal({ onClose, onCreated, onCreatedActivity }: Prop
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="win-modal w-full max-w-lg">
         <div className="win-titlebar">
-          <h2 className="font-semibold">Add Activity</h2>
+          <h2 className="text-[13px] font-semibold">Add Activity</h2>
           <button className="win-button" onClick={onClose} aria-label="Close add activity">
-            ❌
+            ✕
           </button>
         </div>
-        <div className="grid gap-2 p-2">
+        <div className="grid gap-3 p-3">
           <label className="win-field">
             Moodle Activity URL
-            <input className="win-input" placeholder="https://moodle.example.ac.id/mod/assign/view.php?id=..." value={url} onChange={(event) => setUrl(event.target.value)} />
+            <input
+              className="win-input"
+              placeholder="https://moodle.example.ac.id/mod/assign/view.php?id=..."
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+            />
           </label>
           <label className="win-field">
             Activity Type
-            <select className="win-select" value={type} onChange={(event) => setType(event.target.value as "assignment" | "discussion")}>
+            <select
+              className="win-select"
+              value={type}
+              onChange={(event) => setType(event.target.value as "assignment" | "discussion")}
+            >
               <option value="assignment">Assignment</option>
               <option value="discussion">Discussion</option>
             </select>
           </label>
           <label className="win-field">
             Rubrik PDF (opsional)
-            <input className="win-input" type="file" accept="application/pdf,.pdf" onChange={(event) => setRubricFile(event.target.files?.[0] ?? null)} />
+            <input
+              className="win-input"
+              type="file"
+              accept="application/pdf,.pdf"
+              onChange={(event) => setRubricFile(event.target.files?.[0] ?? null)}
+            />
           </label>
-          {rubricFile ? <p className="win-status">📄 {rubricFile.name}</p> : <p className="win-status">Jika kosong, rubrik default akan digunakan.</p>}
-          {error ? <p className="win-status">❌ {error}</p> : null}
+          {rubricFile ? (
+            <p className="win-status">{rubricFile.name}</p>
+          ) : (
+            <p className="win-status text-muted">Jika kosong, rubrik default akan digunakan.</p>
+          )}
+          {error ? <p className="win-status text-danger">{error}</p> : null}
         </div>
-        <div className="flex justify-end gap-1 p-2">
-          <button className="win-button" onClick={onClose}>Cancel</button>
-          <button className="win-button" disabled={busy || !url.trim()} onClick={addActivity}>
-            ➕ Add Activity
+        <div className="flex justify-end gap-1 border-t divider p-3">
+          <button className="win-button" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="win-button win-button-primary"
+            disabled={busy || !url.trim()}
+            onClick={addActivity}
+          >
+            {busy ? "Menambah…" : "Add Activity"}
           </button>
         </div>
       </div>

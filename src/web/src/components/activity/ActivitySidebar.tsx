@@ -26,7 +26,14 @@ interface Props {
   onOpenSettings: () => void;
 }
 
-export function ActivitySidebar({ activities, selectedActivityId, onSelectActivity, onRefresh, onAddOptimistic, onOpenSettings }: Props) {
+export function ActivitySidebar({
+  activities,
+  selectedActivityId,
+  onSelectActivity,
+  onRefresh,
+  onAddOptimistic,
+  onOpenSettings,
+}: Props) {
   const [filter, setFilter] = useState<"all" | "assignment" | "discussion">("all");
   const [busy, setBusy] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -63,7 +70,9 @@ export function ActivitySidebar({ activities, selectedActivityId, onSelectActivi
     if (!selectedActivityId) return;
     setBusy(true);
     try {
-      const result = await apiPost<{ queue: { running: boolean; queued: number; pending: number } }>(`/api/activities/${selectedActivityId}/sync`);
+      const result = await apiPost<{ queue: { running: boolean; queued: number; pending: number } }>(
+        `/api/activities/${selectedActivityId}/sync`,
+      );
       setSyncStatus(result.queue);
       onRefresh();
     } finally {
@@ -74,42 +83,63 @@ export function ActivitySidebar({ activities, selectedActivityId, onSelectActivi
   return (
     <div className="win-window flex h-full flex-col">
       <div className="win-titlebar">
-        <div>
-          <span>Moodle Review</span>
-        </div>
-        <div className="flex gap-2">
-          <button className="win-button" onClick={() => setAddOpen(true)} aria-label="Add activity">
-            ➕
+        <span className="text-[13px] font-semibold tracking-tight">Moodle Review</span>
+        <div className="flex gap-1">
+          <button
+            className="win-button"
+            onClick={() => setAddOpen(true)}
+            aria-label="Add activity"
+            title="Add activity"
+          >
+            +
           </button>
-          <button className="win-button" onClick={onOpenSettings} aria-label="Settings">
-            ⚙️
+          <button
+            className="win-button"
+            onClick={onOpenSettings}
+            aria-label="Settings"
+            title="Settings"
+          >
+            ⚙
           </button>
         </div>
       </div>
 
-      <div className="flex gap-1 p-2">
-        {(["all", "assignment", "discussion"] as const).map((item) => (
-          <button key={item} className={`win-button capitalize ${filter === item ? "active" : ""}`} onClick={() => setFilter(item)}>
-            {item}
-          </button>
-        ))}
-      </div>
+      <div className="grid gap-2 p-2">
+        <div className="flex gap-1">
+          {(["all", "assignment", "discussion"] as const).map((item) => (
+            <button
+              key={item}
+              className={`win-button flex-1 capitalize ${filter === item ? "active" : ""}`}
+              onClick={() => setFilter(item)}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
 
-      <div className="px-2 pb-2">
-        <button className="win-button w-full" disabled={!selectedActivityId || busy} onClick={syncSelected}>
-          {hasSyncingActivity || syncStatus?.pending ? "⏳" : "🔄"} Sync Selected
+        <button
+          className="win-button win-button-primary w-full"
+          disabled={!selectedActivityId || busy}
+          onClick={syncSelected}
+        >
+          {hasSyncingActivity || syncStatus?.pending ? "Syncing…" : "Sync selected"}
         </button>
-      </div>
-      {hasSyncingActivity || syncStatus?.pending ? (
-        <p className="win-status mx-2 mb-2">Sync running · queued {syncStatus?.queued ?? 0} · pending {syncStatus?.pending ?? 0}</p>
-      ) : null}
-      {hasProcessingRubric || rubricStatus?.pending ? (
-        <p className="win-status mx-2 mb-2">Rubrik processing · queued {rubricStatus?.queued ?? 0} · pending {rubricStatus?.pending ?? 0}</p>
-      ) : null}
 
-      <div className="win-inset win-scroll mx-2 mb-2 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-1">
+        {hasSyncingActivity || syncStatus?.pending ? (
+          <p className="win-status">
+            Sync · queued {syncStatus?.queued ?? 0} · pending {syncStatus?.pending ?? 0}
+          </p>
+        ) : null}
+        {hasProcessingRubric || rubricStatus?.pending ? (
+          <p className="win-status">
+            Rubrik · queued {rubricStatus?.queued ?? 0} · pending {rubricStatus?.pending ?? 0}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="win-scroll mx-2 mb-2 grid min-h-0 flex-1 content-start gap-1.5 overflow-y-auto">
         {filtered.length === 0 ? (
-          <p className="p-1">Belum ada activity.</p>
+          <p className="px-1 text-[11.5px] text-muted">Belum ada activity.</p>
         ) : (
           filtered.map((activity) => (
             <ActivityCard
@@ -122,8 +152,20 @@ export function ActivitySidebar({ activities, selectedActivityId, onSelectActivi
           ))
         )}
       </div>
-      {addOpen ? <AddActivityModal onClose={() => setAddOpen(false)} onCreated={onRefresh} onCreatedActivity={onAddOptimistic} /> : null}
-      {editingRubric ? <EditRubricModal activity={editingRubric} onClose={() => setEditingRubric(null)} onUpdated={onRefresh} /> : null}
+      {addOpen ? (
+        <AddActivityModal
+          onClose={() => setAddOpen(false)}
+          onCreated={onRefresh}
+          onCreatedActivity={onAddOptimistic}
+        />
+      ) : null}
+      {editingRubric ? (
+        <EditRubricModal
+          activity={editingRubric}
+          onClose={() => setEditingRubric(null)}
+          onUpdated={onRefresh}
+        />
+      ) : null}
     </div>
   );
 }

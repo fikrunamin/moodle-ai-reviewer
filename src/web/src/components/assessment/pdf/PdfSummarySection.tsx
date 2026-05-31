@@ -50,28 +50,24 @@ export function PdfSummarySection({ fileId }: { fileId: string }) {
   return (
     <div className="grid gap-2">
       <div className="flex items-center justify-between">
-        <span className="font-medium">Ringkasan AI</span>
+        <span className="win-section-title m-0">Ringkasan AI</span>
         <button
           className="win-button"
           disabled={loading}
           onClick={() => summarize(Boolean(summary))}
         >
-          {loading
-            ? "⏳ Meringkas"
-            : summary
-              ? "🔁 Ringkas ulang"
-              : "🪄 Ringkas PDF"}
+          {loading ? "Meringkas…" : summary ? "Ringkas ulang" : "Ringkas"}
         </button>
       </div>
-      {error ? <p className="win-status">⚠️ {error}</p> : null}
+      {error ? <p className="win-status text-danger">{error}</p> : null}
       {summary?.status === "failed" && !error ? (
-        <p className="win-status">⚠️ {summary.error ?? "Gagal meringkas."}</p>
+        <p className="win-status text-danger">{summary.error ?? "Gagal meringkas."}</p>
       ) : null}
       {summary && summary.status === "completed" ? (
         <div className="grid gap-2">
-          <p className="text-sm leading-6">{summary.summary}</p>
+          <p className="text-[12.5px] leading-relaxed text-secondary">{summary.summary}</p>
           {summary.bullet_points.length ? (
-            <ul className="ml-4 list-disc text-xs leading-5">
+            <ul className="ml-4 grid list-disc gap-1 text-[11.5px] leading-relaxed text-secondary">
               {summary.bullet_points.map((point, index) => (
                 <li key={index}>{point}</li>
               ))}
@@ -79,7 +75,7 @@ export function PdfSummarySection({ fileId }: { fileId: string }) {
           ) : null}
         </div>
       ) : !loading && !summary ? (
-        <p className="text-xs">Belum ada ringkasan untuk file ini.</p>
+        <p className="text-[11.5px] text-muted">Belum ada ringkasan.</p>
       ) : null}
     </div>
   );

@@ -3,7 +3,8 @@
   "version": "0.3.0",
   "type": "module",
   "scripts": {
-    "dev": "bun run src/main.ts",
+    "dev": "bun run --watch scripts/dev.ts",
+    "start": "bun run src/main.ts",
     "typecheck": "tsc --noEmit",
     "build:web": "cd src/web && bun run build",
     "build:windows": "bun build ./src/main.ts --compile --target=bun-windows-x64 --outfile=moodle-reviewer.exe",

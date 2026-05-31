@@ -12,15 +12,30 @@ export function BulkActionBar({
   onRegenerateSelected: () => void;
 }) {
   return (
-    <div className="grid grid-cols-1 gap-1 xl:grid-cols-3">
-      <button className="win-button" disabled={disabled} onClick={onGenerateSelected}>
-        ✨ Selected
+    <div className="grid grid-cols-3 gap-1">
+      <button
+        className="win-button win-button-primary"
+        disabled={disabled}
+        onClick={onGenerateSelected}
+        title="Generate untuk yang dipilih"
+      >
+        Selected
       </button>
-      <button className="win-button" disabled={missingDisabled} onClick={onGenerateMissing}>
-        ✨ Missing
+      <button
+        className="win-button"
+        disabled={missingDisabled}
+        onClick={onGenerateMissing}
+        title="Generate untuk yang belum ada review"
+      >
+        Missing
       </button>
-      <button className="win-button" disabled={disabled} onClick={onRegenerateSelected}>
-        🔁 Regenerate
+      <button
+        className="win-button"
+        disabled={disabled}
+        onClick={onRegenerateSelected}
+        title="Regenerate review yang dipilih"
+      >
+        Regenerate
       </button>
     </div>
   );

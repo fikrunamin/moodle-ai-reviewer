@@ -38,10 +38,9 @@ export function LinksSection({ submissionId }: { submissionId: string }) {
 
   const refresh = async () => {
     setBusy(true);
-    setStatus("Mengekstrak link...");
+    setStatus("Mengekstrak link…");
     try {
       await apiPost(`/api/submissions/${encodeURIComponent(submissionId)}/links/refresh`);
-      // Allow background queue to finish briefly
       setTimeout(() => {
         load();
         setStatus(null);
@@ -57,18 +56,17 @@ export function LinksSection({ submissionId }: { submissionId: string }) {
   const otherLinks = links.filter((link) => link.kind !== "youtube" || !link.youtube_video_id);
 
   return (
-    <section className="grid gap-3">
+    <section className="grid gap-2">
       <div className="flex items-center justify-between">
-        <h3 className="win-section-title m-0">🔗 Links ({links.length})</h3>
+        <h3 className="win-section-title m-0">Links · {links.length}</h3>
         <button className="win-button" disabled={busy} onClick={refresh}>
-          {busy ? "⏳ Refresh" : "🔁 Refresh"}
+          {busy ? "Refresh…" : "Refresh"}
         </button>
       </div>
       {status ? <p className="win-status">{status}</p> : null}
 
       {youtubeLinks.length ? (
-        <div className="grid gap-3">
-          <p className="text-xs font-medium">YouTube ({youtubeLinks.length})</p>
+        <div className="grid gap-2">
           {youtubeLinks.map((link) => (
             <YouTubePreview
               key={link.id}
@@ -84,23 +82,28 @@ export function LinksSection({ submissionId }: { submissionId: string }) {
       ) : null}
 
       {otherLinks.length ? (
-        <div className="grid gap-1">
-          <p className="text-xs font-medium">Tautan lain ({otherLinks.length})</p>
-          <ul className="grid gap-1">
-            {otherLinks.map((link) => (
-              <li key={link.id} className="win-inset flex items-center justify-between gap-2 px-2 py-1">
-                <a className="truncate text-xs underline" href={link.url} target="_blank" rel="noreferrer noopener">
-                  {hostname(link.url)}
-                </a>
-                <span className="text-xs uppercase">{link.kind}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+        <ul className="grid gap-1">
+          {otherLinks.map((link) => (
+            <li
+              key={link.id}
+              className="win-inset flex items-center justify-between gap-2 px-2.5 py-1.5"
+            >
+              <a
+                className="truncate text-[12px]"
+                href={link.url}
+                target="_blank"
+                rel="noreferrer noopener"
+              >
+                {hostname(link.url)}
+              </a>
+              <span className="text-[10.5px] uppercase tracking-wider text-muted">{link.kind}</span>
+            </li>
+          ))}
+        </ul>
       ) : null}
 
       {!links.length && !busy ? (
-        <p className="text-xs">Belum ada link yang ditemukan.</p>
+        <p className="text-[11.5px] text-muted">Belum ada link yang ditemukan.</p>
       ) : null}
     </section>
   );

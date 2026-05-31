@@ -36,7 +36,6 @@ export function ReferencesSection({ submissionId }: { submissionId: string }) {
     load();
   }, [submissionId]);
 
-  // Auto-poll if any reference is resolving
   useEffect(() => {
     if (!refs.length) return;
     const stillBusy = refs.some(
@@ -49,7 +48,7 @@ export function ReferencesSection({ submissionId }: { submissionId: string }) {
 
   const refresh = async () => {
     setBusy(true);
-    setStatus("Mengekstrak referensi...");
+    setStatus("Mengekstrak referensi…");
     try {
       await apiPost(`/api/submissions/${encodeURIComponent(submissionId)}/references/refresh`);
       setTimeout(() => {
@@ -64,17 +63,17 @@ export function ReferencesSection({ submissionId }: { submissionId: string }) {
   };
 
   return (
-    <section className="grid gap-3">
+    <section className="grid gap-2">
       <div className="flex items-center justify-between">
-        <h3 className="win-section-title m-0">📚 References ({refs.length})</h3>
+        <h3 className="win-section-title m-0">References · {refs.length}</h3>
         <button className="win-button" disabled={busy} onClick={refresh}>
-          {busy ? "⏳ Refresh" : "🔁 Refresh"}
+          {busy ? "Refresh…" : "Refresh"}
         </button>
       </div>
       {status ? <p className="win-status">{status}</p> : null}
       {!refs.length && !busy ? (
-        <p className="text-xs">
-          Belum ada referensi terdeteksi. Coba klik Refresh setelah PDF diproses.
+        <p className="text-[11.5px] text-muted">
+          Belum ada referensi terdeteksi. Klik Refresh setelah PDF diproses.
         </p>
       ) : null}
       <div className="grid gap-2">

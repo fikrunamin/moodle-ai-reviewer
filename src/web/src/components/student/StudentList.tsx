@@ -31,7 +31,9 @@ export function StudentList({ activityId, selectedStudentId, onSelectStudent }: 
       setStudents([]);
       return;
     }
-    apiGet<Student[]>(`/api/activities/${activityId}/students`).then(setStudents).catch(() => setStudents([]));
+    apiGet<Student[]>(`/api/activities/${activityId}/students`)
+      .then(setStudents)
+      .catch(() => setStudents([]));
   };
 
   useEffect(() => {
@@ -45,7 +47,7 @@ export function StudentList({ activityId, selectedStudentId, onSelectStudent }: 
       apiGet<{ running: boolean; queued: number; pending: number }>("/api/jobs/ai")
         .then((next) => {
           setJobStatus(next);
-          if (next.pending === 0) setMessage("Bulk generate finished");
+          if (next.pending === 0) setMessage("Bulk generate selesai");
         })
         .catch(() => null);
       refresh();
@@ -63,8 +65,11 @@ export function StudentList({ activityId, selectedStudentId, onSelectStudent }: 
 
   async function generate(ids: string[], mode: "selected" | "missing" = "selected") {
     if (ids.length === 0) return;
-    setMessage("Bulk generate queued");
-    const result = await apiPost<{ queue: { running: boolean; queued: number; pending: number } }>("/api/assessments/generate-bulk", { studentIds: ids, mode });
+    setMessage("Bulk generate antri…");
+    const result = await apiPost<{ queue: { running: boolean; queued: number; pending: number } }>(
+      "/api/assessments/generate-bulk",
+      { studentIds: ids, mode },
+    );
     setJobStatus(result.queue);
     refresh();
   }
@@ -72,59 +77,81 @@ export function StudentList({ activityId, selectedStudentId, onSelectStudent }: 
   return (
     <div className="win-window flex h-full flex-col">
       <div className="win-titlebar">
-        <span>Mahasiswa</span>
-        <span>{students.length} records</span>
+        <span className="text-[13px] font-semibold tracking-tight">Mahasiswa</span>
+        <span className="text-[11px] text-muted">{students.length} records</span>
       </div>
-      <div className="grid gap-1 p-2 xl:grid-cols-[1fr_130px]">
-        <input className="win-input" placeholder="Search mahasiswa" value={search} onChange={(event) => setSearch(event.target.value)} />
-        <select className="win-select" value={status} onChange={(event) => setStatus(event.target.value)}>
-          <option value="all">All AI Status</option>
-          <option value="pending">Pending</option>
-          <option value="processing">Processing</option>
-          <option value="completed">Completed</option>
-          <option value="failed">Failed</option>
-        </select>
-      </div>
-      <label className="flex items-center gap-1 px-2 pb-1">
-        <input
-          type="checkbox"
-          checked={allVisibleSelected}
-          onChange={(event) =>
-            setSelectedIds(event.target.checked ? Array.from(new Set([...selectedIds, ...filtered.map((student) => student.id)])) : selectedIds.filter((id) => !filtered.some((student) => student.id === id)))
-          }
-        />
-        Select all visible
-      </label>
-      <BulkActionBar
-        disabled={!activityId || selectedIds.length === 0 || Boolean(jobStatus?.pending)}
-        missingDisabled={!activityId || students.length === 0 || Boolean(jobStatus?.pending)}
-        onGenerateSelected={() => generate(selectedIds)}
-        onGenerateMissing={() => generate(students.map((student) => student.id), "missing")}
-        onRegenerateSelected={() => generate(selectedIds)}
-      />
-      {message || jobStatus?.pending ? (
-        <p className="win-status mx-2 mt-1">
-          {message}
-          {jobStatus?.pending ? ` · running ${jobStatus.running ? "yes" : "no"} · queued ${jobStatus.queued} · pending ${jobStatus.pending}` : ""}
-        </p>
-      ) : null}
-      <div className="win-inset win-scroll m-2 flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-1">
-      {filtered.length === 0 ? (
-        <p className="p-1">Pilih activity untuk melihat mahasiswa.</p>
-      ) : (
-        filtered.map((student) => (
-          <StudentItem
-            key={student.id}
-            student={student}
-            active={student.id === selectedStudentId}
-            checked={selectedIds.includes(student.id)}
-            onCheckedChange={(checked) =>
-              setSelectedIds((current) => (checked ? Array.from(new Set([...current, student.id])) : current.filter((id) => id !== student.id)))
-            }
-            onClick={() => onSelectStudent(student.id)}
+      <div className="grid gap-2 p-2">
+        <div className="grid gap-1 xl:grid-cols-[1fr_140px]">
+          <input
+            className="win-input"
+            placeholder="Search mahasiswa"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
           />
-        ))
-      )}
+          <select
+            className="win-select"
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+          >
+            <option value="all">All status</option>
+            <option value="pending">Pending</option>
+            <option value="processing">Processing</option>
+            <option value="completed">Completed</option>
+            <option value="failed">Failed</option>
+          </select>
+        </div>
+        <label className="flex items-center gap-2 text-[11.5px] text-secondary">
+          <input
+            type="checkbox"
+            className="accent-[var(--accent-strong)]"
+            checked={allVisibleSelected}
+            onChange={(event) =>
+              setSelectedIds(
+                event.target.checked
+                  ? Array.from(new Set([...selectedIds, ...filtered.map((student) => student.id)]))
+                  : selectedIds.filter((id) => !filtered.some((student) => student.id === id)),
+              )
+            }
+          />
+          Select all visible ({filtered.length})
+        </label>
+        <BulkActionBar
+          disabled={!activityId || selectedIds.length === 0 || Boolean(jobStatus?.pending)}
+          missingDisabled={!activityId || students.length === 0 || Boolean(jobStatus?.pending)}
+          onGenerateSelected={() => generate(selectedIds)}
+          onGenerateMissing={() => generate(students.map((student) => student.id), "missing")}
+          onRegenerateSelected={() => generate(selectedIds)}
+        />
+        {message || jobStatus?.pending ? (
+          <p className="win-status">
+            {message}
+            {jobStatus?.pending
+              ? ` · running ${jobStatus.running ? "yes" : "no"} · queued ${jobStatus.queued} · pending ${jobStatus.pending}`
+              : ""}
+          </p>
+        ) : null}
+      </div>
+      <div className="win-scroll mx-2 mb-2 grid min-h-0 flex-1 content-start gap-1 overflow-y-auto">
+        {filtered.length === 0 ? (
+          <p className="px-1 text-[11.5px] text-muted">Pilih activity untuk melihat mahasiswa.</p>
+        ) : (
+          filtered.map((student) => (
+            <StudentItem
+              key={student.id}
+              student={student}
+              active={student.id === selectedStudentId}
+              checked={selectedIds.includes(student.id)}
+              onCheckedChange={(checked) =>
+                setSelectedIds((current) =>
+                  checked
+                    ? Array.from(new Set([...current, student.id]))
+                    : current.filter((id) => id !== student.id),
+                )
+              }
+              onClick={() => onSelectStudent(student.id)}
+            />
+          ))
+        )}
       </div>
     </div>
   );

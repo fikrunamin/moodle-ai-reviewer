@@ -27,11 +27,11 @@ export function YouTubePreview({ videoId, url, title, author, thumbnailUrl, oemb
           referrerPolicy="strict-origin-when-cross-origin"
         />
         <div className="flex items-center justify-between gap-2">
-          <a className="text-xs underline" href={url} target="_blank" rel="noreferrer">
+          <a className="truncate text-[12px]" href={url} target="_blank" rel="noreferrer">
             {displayTitle}
           </a>
-          <button className="win-button px-2 py-1" onClick={() => setPlaying(false)}>
-            ⏹ Tutup
+          <button className="win-button" onClick={() => setPlaying(false)}>
+            Tutup
           </button>
         </div>
       </div>
@@ -49,26 +49,26 @@ export function YouTubePreview({ videoId, url, title, author, thumbnailUrl, oemb
         <img
           src={thumb}
           alt={displayTitle}
-          className="aspect-video w-full object-cover"
+          className="aspect-video w-full object-cover opacity-90 transition-opacity hover:opacity-100"
           loading="lazy"
         />
         <span
           aria-hidden
-          className="absolute grid h-12 w-12 place-items-center rounded-full bg-black/70 text-2xl text-white"
+          className="absolute grid h-12 w-12 place-items-center rounded-full bg-black/70 text-xl text-white shadow-lg backdrop-blur-sm"
         >
           ▶
         </span>
       </button>
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium">{displayTitle}</p>
-          {author ? <p className="truncate text-xs text-slate-700">{author}</p> : null}
+          <p className="truncate text-[12.5px] font-medium">{displayTitle}</p>
+          {author ? <p className="truncate text-[11px] text-muted">{author}</p> : null}
           {oembedStatus === "failed" ? (
-            <p className="text-xs">Metadata tidak tersedia, klik untuk memutar.</p>
+            <p className="text-[11px] text-muted">Metadata tidak tersedia, klik untuk memutar.</p>
           ) : null}
         </div>
-        <a className="win-button px-2 py-1" href={url} target="_blank" rel="noreferrer">
-          ↗ Buka
+        <a className="win-button" href={url} target="_blank" rel="noreferrer">
+          Buka
         </a>
       </div>
     </div>
