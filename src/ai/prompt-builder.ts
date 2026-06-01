@@ -133,6 +133,83 @@ export function buildForumReferenceRelevancePrompt(input: {
     .join("\n\n");
 }
 
+export function buildCitationValidationPrompt(input: {
+  mode: "assignment" | "forum";
+  courseContext?: string | null;
+  instruction?: string | null;
+  forumPrompt?: string | null;
+  studentText: string;
+  reference: {
+    rawText: string;
+    authors?: string[] | null;
+    year?: number | null;
+    title?: string | null;
+    source?: string | null;
+    doi?: string | null;
+    url?: string | null;
+    arxivId?: string | null;
+  };
+  resolvedMetadata?: string | null;
+}) {
+  return [
+    "Anda adalah Citation & Reference Validation Agent untuk membantu dosen memeriksa referensi mahasiswa.",
+    "Anda TIDAK boleh mengakses internet dan TIDAK boleh mengarang metadata. Gunakan hanya data yang diberikan: teks mahasiswa, sitasi mentah, parsed metadata, dan metadata hasil resolve yang sudah tersimpan.",
+    "Tugas utama: cek apakah sitasi tampak valid/terlacak, apakah metadata cocok dengan hasil resolve, kualitas sumber, dan apakah referensi mendukung klaim/topik mahasiswa sejauh bisa dinilai dari data yang tersedia.",
+    "Buat JSON valid tanpa markdown.",
+    'Schema: {"validation_status":"valid|likely_valid|unverified|invalid","claim_support":"supports|partially_supports|does_not_support|not_assessed","metadata_match_score":0,"source_quality_score":0,"reference_type":"journal_article|conference_paper|book|chapter|webpage|pdf_document|preprint|report|video|unknown","matched_url":"string atau null","matched_doi":"string atau null","matched_title":"string atau null","evidence":["bukti ringkas"],"issues":["masalah/risiko ringkas"],"analysis":"ringkasan untuk tutor"}',
+    "metadata_match_score dan source_quality_score gunakan skala 0-100. Jika bukti kurang, pilih unverified/not_assessed dan skor konservatif.",
+    "Jangan menyatakan sumber mendukung klaim jika hanya ada judul/metadata tanpa abstrak/snippet yang relevan.",
+    `Mode: ${input.mode}`,
+    `Konteks mata kuliah: ${input.courseContext ?? ""}`,
+    input.instruction ? `Instruksi tugas: ${boundedText(input.instruction, 5000, "Instruksi")}` : "",
+    input.forumPrompt ? `Instruksi/study case forum: ${boundedText(input.forumPrompt, 5000, "Instruksi forum")}` : "",
+    `Teks mahasiswa: ${boundedText(input.studentText, Number(process.env.CITATION_VALIDATION_STUDENT_TEXT_MAX_CHARS ?? 16000), "Teks mahasiswa")}`,
+    `Referensi yang dikutip: ${JSON.stringify(input.reference)}`,
+    input.resolvedMetadata
+      ? `Metadata resolve yang sudah tersimpan: ${boundedText(input.resolvedMetadata, Number(process.env.CITATION_VALIDATION_METADATA_MAX_CHARS ?? 12000), "Metadata resolve")}`
+      : "Metadata resolve yang sudah tersimpan: null",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
+export function buildReferenceSearchPlanPrompt(input: {
+  rawText: string;
+  title?: string | null;
+  authors?: string[] | null;
+  year?: number | null;
+  doi?: string | null;
+  url?: string | null;
+  arxivId?: string | null;
+  contextText?: string | null;
+}) {
+  const known = {
+    title: input.title ?? null,
+    authors: input.authors ?? null,
+    year: input.year ?? null,
+    doi: input.doi ?? null,
+    url: input.url ?? null,
+    arxiv_id: input.arxivId ?? null,
+  };
+  return [
+    "Anda adalah Research Search Agent yang menyusun RENCANA pencarian referensi akademik dari sebuah sitasi mahasiswa.",
+    "Anda TIDAK mengakses internet. Tugas Anda hanya menghasilkan query pencarian terbaik dan klasifikasi sumber. Jangan mengarang metadata atau hasil.",
+    "Buat JSON valid tanpa markdown.",
+    'Schema: {"intent":"academic|pdf_document|general|technical|news","is_academic":true,"language":"id|en","queries":["query umum terurut prioritas"],"pdf_queries":["pola pencarian PDF"],"expected_doi":"string atau null","expected_arxiv_id":"string atau null","title_guess":"string atau null"}',
+    "queries: 2-5 query Google yang paling mungkin menemukan sumber asli. Gunakan judul dalam tanda kutip bila ada, tambahkan penulis utama dan tahun bila tersedia.",
+    'pdf_queries: 3-6 pola untuk menemukan PDF, contoh: \'"{judul}" filetype:pdf\', \'site:ac.id filetype:pdf {judul}\', \'site:edu filetype:pdf {judul}\', \'site:go.id filetype:pdf {topik}\', \'site:gov filetype:pdf {topik}\', \'site:org filetype:pdf {topik}\', \'intitle:{judul} pdf\'.',
+    "Ganti {judul}/{topik} dengan kata kunci nyata dari sitasi. Jangan menyertakan placeholder kurung kurawal di output.",
+    "Jika sitasi jelas non-akademik (berita, blog, Wikipedia, video), set is_academic=false dan intent yang sesuai.",
+    `Metadata yang sudah diketahui: ${JSON.stringify(known)}`,
+    `Sitasi mentah: ${boundedText(input.rawText, 1500, "Sitasi")}`,
+    input.contextText
+      ? `Konteks kalimat di sekitar sitasi (untuk memahami topik): ${boundedText(input.contextText, 1500, "Konteks")}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+}
+
 export function buildPdfSummaryPrompt(input: {
   filename?: string | null;
   courseContext?: string | null;

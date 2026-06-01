@@ -8,6 +8,7 @@ import { aiQueue, enrichmentQueue, referenceQueue } from "../jobs/queues";
 import { extractPdfEnrichmentsJob } from "../jobs/extract-pdf-enrichments.job";
 import { summarizePdfJob } from "../jobs/summarize-pdf.job";
 import { resolveReferenceJob } from "../jobs/resolve-reference.job";
+import { validateReferenceJob } from "../jobs/validate-reference.job";
 import { logger } from "../shared/logger";
 import type { ExtractedReference } from "../shared/types";
 
@@ -29,10 +30,19 @@ function serializeReference(reference: ExtractedReference) {
       metadata = null;
     }
   }
+  let validation: unknown = null;
+  if (reference.validation_json) {
+    try {
+      validation = JSON.parse(reference.validation_json);
+    } catch {
+      validation = null;
+    }
+  }
   return {
     ...reference,
     authors,
     resolved_metadata: metadata,
+    validation,
   };
 }
 
@@ -109,6 +119,14 @@ export function registerPdfRoutes(app: Hono) {
   app.post("/api/references/:refId/resolve", (c) => {
     const refId = c.req.param("refId");
     referenceQueue.enqueue(() => resolveReferenceJob(refId));
+    return c.json({ queued: true, queue: referenceQueue.getStatus() });
+  });
+
+  app.post("/api/references/:refId/validate", (c) => {
+    const refId = c.req.param("refId");
+    referenceQueue.enqueue(async () => {
+      await validateReferenceJob(refId);
+    });
     return c.json({ queued: true, queue: referenceQueue.getStatus() });
   });
 

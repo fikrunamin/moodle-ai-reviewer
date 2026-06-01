@@ -23,6 +23,7 @@ data/app.sqlite-*
 data/downloads/*
 data/extracted/*
 data/rubrics/*
+data/references/*
 data/updates/*
 data/sessions/*
 data/logs/*

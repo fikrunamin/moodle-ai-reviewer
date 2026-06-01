@@ -199,4 +199,44 @@ export class ForumReferenceRepository {
       )
       .run(JSON.stringify(analysis ?? null), id);
   }
+
+  setValidationState(id: string, state: ForumReference["validation_state"], error: string | null = null) {
+    getDb()
+      .query(
+        "UPDATE forum_references SET validation_state = ?, validation_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      )
+      .run(state, error, id);
+  }
+
+  setValidation(input: {
+    id: string;
+    validationStatus: ForumReference["validation_status"];
+    claimSupport: ForumReference["claim_support"];
+    metadataMatchScore: number;
+    sourceQualityScore: number;
+    referenceType: ForumReference["reference_type"];
+    matchedUrl: string | null;
+    matchedDoi: string | null;
+    validation: unknown;
+  }) {
+    getDb()
+      .query(
+        `UPDATE forum_references
+         SET validation_state = 'completed', validation_status = ?, claim_support = ?, metadata_match_score = ?,
+             source_quality_score = ?, reference_type = ?, matched_url = ?, matched_doi = ?, validation_json = ?,
+             validation_error = NULL, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+      )
+      .run(
+        input.validationStatus,
+        input.claimSupport,
+        input.metadataMatchScore,
+        input.sourceQualityScore,
+        input.referenceType,
+        input.matchedUrl,
+        input.matchedDoi,
+        JSON.stringify(input.validation ?? null),
+        input.id,
+      );
+  }
 }

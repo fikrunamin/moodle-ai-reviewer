@@ -9,6 +9,7 @@ import { extractForumReferencesJob } from "../jobs/extract-forum-references.job"
 import { generateDiscussionReviewJob } from "../jobs/generate-discussion-review.job";
 import { generateForumReplySuggestionJob } from "../jobs/generate-forum-reply-suggestion.job";
 import { resolveForumReferenceJob } from "../jobs/resolve-forum-reference.job";
+import { validateForumReferenceJob } from "../jobs/validate-forum-reference.job";
 import type { ForumReference, ForumReplySuggestion } from "../shared/types";
 
 function parseJson(value: string | null): unknown {
@@ -26,6 +27,7 @@ function serializeForumReference(reference: ForumReference) {
     authors: parseJson(reference.authors) ?? null,
     resolved_metadata: parseJson(reference.resolved_metadata_json) ?? null,
     relevance: parseJson(reference.relevance_json) ?? null,
+    validation: parseJson(reference.validation_json) ?? null,
   };
 }
 
@@ -86,6 +88,14 @@ export function registerForumRoutes(app: Hono) {
     const refId = c.req.param("refId");
     referenceQueue.enqueue(async () => {
       await analyzeForumReferenceRelevanceJob(refId);
+    });
+    return c.json({ queued: true, queue: referenceQueue.getStatus() });
+  });
+
+  app.post("/api/forum/references/:refId/validate", (c) => {
+    const refId = c.req.param("refId");
+    referenceQueue.enqueue(async () => {
+      await validateForumReferenceJob(refId);
     });
     return c.json({ queued: true, queue: referenceQueue.getStatus() });
   });

@@ -9,6 +9,19 @@ function ensureColumn(table: string, column: string, definition: string) {
   }
 }
 
+function ensureReferenceValidationColumns(table: string) {
+  ensureColumn(table, "validation_state", "TEXT NOT NULL DEFAULT 'pending'");
+  ensureColumn(table, "validation_status", "TEXT");
+  ensureColumn(table, "claim_support", "TEXT");
+  ensureColumn(table, "metadata_match_score", "REAL");
+  ensureColumn(table, "source_quality_score", "REAL");
+  ensureColumn(table, "reference_type", "TEXT");
+  ensureColumn(table, "matched_url", "TEXT");
+  ensureColumn(table, "matched_doi", "TEXT");
+  ensureColumn(table, "validation_json", "TEXT");
+  ensureColumn(table, "validation_error", "TEXT");
+}
+
 export async function migrate() {
   getDb().exec(schemaSql);
   ensureColumn("moodle_activities", "instruction", "TEXT");
@@ -35,5 +48,7 @@ export async function migrate() {
   ensureColumn("moodle_discussion_posts", "has_rating_menu", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn("moodle_discussion_posts", "rating_max", "REAL");
   ensureColumn("moodle_discussion_posts", "is_first_post", "INTEGER NOT NULL DEFAULT 0");
+  ensureReferenceValidationColumns("extracted_references");
+  ensureReferenceValidationColumns("forum_references");
   getDb().exec("CREATE INDEX IF NOT EXISTS idx_discussion_posts_moodle_post ON moodle_discussion_posts(moodle_post_id)");
 }

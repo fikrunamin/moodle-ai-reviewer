@@ -113,6 +113,16 @@ export interface ForumReference {
   relevance_status: "pending" | "analyzing" | "completed" | "failed";
   relevance_json: string | null;
   relevance_error: string | null;
+  validation_state: ReferenceValidationState;
+  validation_status: ReferenceValidationStatus | null;
+  claim_support: ReferenceClaimSupport | null;
+  metadata_match_score: number | null;
+  source_quality_score: number | null;
+  reference_type: ReferenceType | null;
+  matched_url: string | null;
+  matched_doi: string | null;
+  validation_json: string | null;
+  validation_error: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -194,7 +204,32 @@ export interface ExtractedLink {
 
 export type ReferenceParseStatus = "parsed" | "failed";
 export type ReferenceResolveStatus = "pending" | "resolving" | "found" | "not_found" | "failed";
-export type ReferenceResolveSource = "google" | "crossref" | "unpaywall" | "arxiv" | "cache" | "none";
+export type ReferenceValidationState = "pending" | "validating" | "completed" | "failed";
+export type ReferenceValidationStatus = "valid" | "likely_valid" | "unverified" | "invalid";
+export type ReferenceClaimSupport = "supports" | "partially_supports" | "does_not_support" | "not_assessed";
+export type ReferenceType =
+  | "journal_article"
+  | "conference_paper"
+  | "book"
+  | "chapter"
+  | "webpage"
+  | "pdf_document"
+  | "preprint"
+  | "report"
+  | "video"
+  | "unknown";
+export type ReferenceResolveSource =
+  | "google"
+  | "semantic_scholar"
+  | "openalex"
+  | "tavily"
+  | "brave"
+  | "serpapi"
+  | "crossref"
+  | "unpaywall"
+  | "arxiv"
+  | "cache"
+  | "none";
 
 export interface ExtractedReference {
   id: string;
@@ -214,6 +249,16 @@ export interface ExtractedReference {
   resolved_pdf_url: string | null;
   resolved_metadata_json: string | null;
   resolve_error: string | null;
+  validation_state: ReferenceValidationState;
+  validation_status: ReferenceValidationStatus | null;
+  claim_support: ReferenceClaimSupport | null;
+  metadata_match_score: number | null;
+  source_quality_score: number | null;
+  reference_type: ReferenceType | null;
+  matched_url: string | null;
+  matched_doi: string | null;
+  validation_json: string | null;
+  validation_error: string | null;
   created_at: string;
   updated_at: string;
 }

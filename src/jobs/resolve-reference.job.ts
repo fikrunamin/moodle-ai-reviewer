@@ -1,6 +1,7 @@
 import { ReferenceRepository } from "../database/repositories/reference.repository";
 import { resolveReference } from "../references/reference-resolver";
 import { logger } from "../shared/logger";
+import { validateReferenceJob } from "./validate-reference.job";
 
 export async function resolveReferenceJob(referenceId: string) {
   const repo = new ReferenceRepository();
@@ -20,6 +21,7 @@ export async function resolveReferenceJob(referenceId: string) {
     if (!outcome.pdfPath && outcome.error) {
       repo.setResolveStatus(referenceId, "not_found", outcome.error);
     }
+    await validateReferenceJob(referenceId).catch(() => null);
   } catch (error) {
     logger.error("Resolve reference failed", error);
     repo.setResolveStatus(
@@ -27,5 +29,6 @@ export async function resolveReferenceJob(referenceId: string) {
       "failed",
       error instanceof Error ? error.message : String(error),
     );
+    await validateReferenceJob(referenceId).catch(() => null);
   }
 }

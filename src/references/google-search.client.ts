@@ -1,5 +1,6 @@
 import { logger } from "../shared/logger";
 import { launchBrowser } from "../browser/puppeteer-client";
+import { authorityForUrl, emptyCandidate, type ReferenceCandidate } from "./reference-candidate";
 
 const REQUEST_TIMEOUT_MS = Number(process.env.REFERENCE_REQUEST_TIMEOUT_MS ?? 20_000);
 const DOI_REGEX = /\b(10\.\d{4,9}\/[\w\-.;()/: %#]+)\b/i;
@@ -139,4 +140,51 @@ async function searchGoogleReferenceWithBrowser(searchUrl: string): Promise<Goog
   } finally {
     await browser.close().catch(() => null);
   }
+}
+
+function hitToCandidates(hit: GoogleReferenceSearchHit): ReferenceCandidate[] {
+  const candidates: ReferenceCandidate[] = [];
+  for (const pdfUrl of hit.pdfUrls) {
+    const candidate = emptyCandidate("google");
+    candidate.url = pdfUrl;
+    candidate.pdfUrl = pdfUrl;
+    candidate.doi = hit.doi;
+    candidate.authority = authorityForUrl(pdfUrl);
+    candidates.push(candidate);
+  }
+  for (const landingUrl of hit.landingUrls) {
+    const candidate = emptyCandidate("google");
+    candidate.url = landingUrl;
+    candidate.doi = hit.doi;
+    candidate.authority = authorityForUrl(landingUrl);
+    candidates.push(candidate);
+  }
+  return candidates;
+}
+
+/**
+ * Run a set of Google queries (typically the planner's pdf_queries) and return
+ * normalized candidates. Best effort: Google often blocks automation, in which
+ * case this returns whatever was found before the block.
+ */
+export async function searchGoogleQueries(queries: string[]): Promise<ReferenceCandidate[]> {
+  if (process.env.REFERENCE_GOOGLE_SEARCH_ENABLED === "false") return [];
+  const limit = Math.max(1, Number(process.env.REFERENCE_GOOGLE_QUERY_LIMIT ?? 3));
+  const selected = Array.from(new Set(queries.map((q) => q.trim()).filter(Boolean))).slice(0, limit);
+
+  const seen = new Set<string>();
+  const candidates: ReferenceCandidate[] = [];
+  for (const query of selected) {
+    const hit = await searchGoogleReference(query).catch((error) => {
+      logger.warn("Google query search failed", error);
+      return null;
+    });
+    if (!hit) continue;
+    for (const candidate of hitToCandidates(hit)) {
+      if (!candidate.url || seen.has(candidate.url)) continue;
+      seen.add(candidate.url);
+      candidates.push(candidate);
+    }
+  }
+  return candidates;
 }

@@ -2,9 +2,13 @@ import { nanoid } from "nanoid";
 import { getDb } from "../db";
 import type {
   ExtractedReference,
+  ReferenceClaimSupport,
   ReferenceResolution,
   ReferenceResolveSource,
   ReferenceResolveStatus,
+  ReferenceType,
+  ReferenceValidationState,
+  ReferenceValidationStatus,
 } from "../../shared/types";
 
 export interface ParsedReferenceInput {
@@ -86,6 +90,46 @@ export class ReferenceRepository {
         input.pdfPath,
         input.pdfUrl,
         JSON.stringify(input.metadata ?? null),
+        input.id,
+      );
+  }
+
+  setValidationState(id: string, state: ReferenceValidationState, error: string | null = null) {
+    getDb()
+      .query(
+        "UPDATE extracted_references SET validation_state = ?, validation_error = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+      )
+      .run(state, error, id);
+  }
+
+  setValidation(input: {
+    id: string;
+    validationStatus: ReferenceValidationStatus;
+    claimSupport: ReferenceClaimSupport;
+    metadataMatchScore: number;
+    sourceQualityScore: number;
+    referenceType: ReferenceType;
+    matchedUrl: string | null;
+    matchedDoi: string | null;
+    validation: unknown;
+  }) {
+    getDb()
+      .query(
+        `UPDATE extracted_references
+         SET validation_state = 'completed', validation_status = ?, claim_support = ?, metadata_match_score = ?,
+             source_quality_score = ?, reference_type = ?, matched_url = ?, matched_doi = ?, validation_json = ?,
+             validation_error = NULL, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ?`,
+      )
+      .run(
+        input.validationStatus,
+        input.claimSupport,
+        input.metadataMatchScore,
+        input.sourceQualityScore,
+        input.referenceType,
+        input.matchedUrl,
+        input.matchedDoi,
+        JSON.stringify(input.validation ?? null),
         input.id,
       );
   }
