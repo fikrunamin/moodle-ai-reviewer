@@ -58,14 +58,23 @@ function safeFilename(name: string) {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
-function windowsUpdaterScript(input: { zipPath: string; appRoot: string; executablePath: string; processId: number; extractDir: string; logPath: string }) {
+function windowsUpdaterScript(input: {
+  zipPath: string;
+  appRoot: string;
+  executableName: string;
+  processId: number;
+  extractDir: string;
+  currentLink: string;
+  logPath: string;
+}) {
   return `@echo off
 setlocal enabledelayedexpansion
 set "ZIP=${input.zipPath}"
 set "DEST=${input.appRoot}"
-set "EXE=${input.executablePath}"
+set "EXE_NAME=${input.executableName}"
 set "APP_PID=${input.processId}"
 set "TMP=${input.extractDir}"
+set "CURRENT=${input.currentLink}"
 set "LOG=${input.logPath}"
 
 echo [%date% %time%] Waiting for Moodle AI Review Assistant to close... > "%LOG%"
@@ -84,17 +93,29 @@ if errorlevel 1 goto failed
 set "SRC="
 for /d %%D in ("%TMP%\\*") do (
   set "SRC=%%~fD"
-  goto copy
+  goto link
 )
 goto failed
 
-:copy
-echo [%date% %time%] Copying update from %SRC% to %DEST%... >> "%LOG%"
-robocopy "%SRC%" "%DEST%" /E /XD "%SRC%\\data" /NFL /NDL /NJH /NJS /NP >> "%LOG%" 2>&1
-if %ERRORLEVEL% GEQ 8 goto failed
+:link
+echo [%date% %time%] Switching current release to %SRC%... >> "%LOG%"
+if exist "%CURRENT%" rmdir "%CURRENT%" >> "%LOG%" 2>&1
+mklink /J "%CURRENT%" "%SRC%" >> "%LOG%" 2>&1
+if errorlevel 1 goto failed
 
+set "NEW_EXE=%CURRENT%\\%EXE_NAME%"
+if exist "%NEW_EXE%" goto restart
+for %%F in ("%CURRENT%\\*.exe") do (
+  if exist "%%~fF" (
+    set "NEW_EXE=%%~fF"
+    goto restart
+  )
+)
+goto failed
+
+:restart
 echo [%date% %time%] Restarting app... >> "%LOG%"
-start "" "%EXE%"
+start "" /D "%DEST%" "%NEW_EXE%"
 exit /b 0
 
 :failed
@@ -104,14 +125,24 @@ exit /b 1
 `;
 }
 
-function unixUpdaterScript(input: { zipPath: string; appRoot: string; executablePath: string; processId: number; extractDir: string; logPath: string }) {
+function unixUpdaterScript(input: {
+  zipPath: string;
+  appRoot: string;
+  executableName: string;
+  processId: number;
+  extractDir: string;
+  currentLink: string;
+  logPath: string;
+}) {
   return `#!/bin/sh
 set -eu
 ZIP="${input.zipPath}"
 DEST="${input.appRoot}"
-EXE="${input.executablePath}"
+EXE_NAME="${input.executableName}"
 APP_PID="${input.processId}"
 TMP="${input.extractDir}"
+CURRENT="${input.currentLink}"
+CURRENT_NEW="${input.currentLink}.new"
 LOG="${input.logPath}"
 
 echo "Waiting for Moodle AI Review Assistant to close..." > "$LOG"
@@ -129,15 +160,29 @@ if [ -z "$SRC" ]; then
   exit 1
 fi
 
-echo "Copying update from $SRC to $DEST..." >> "$LOG"
-if command -v rsync >/dev/null 2>&1; then
-  rsync -a --exclude data "$SRC"/ "$DEST"/ >> "$LOG" 2>&1
-else
-  cp -R "$SRC"/. "$DEST"/ >> "$LOG" 2>&1
+echo "Switching current release to $SRC..." >> "$LOG"
+rm -f "$CURRENT_NEW"
+ln -s "$SRC" "$CURRENT_NEW"
+if [ -L "$CURRENT" ]; then
+  rm "$CURRENT"
+elif [ -e "$CURRENT" ]; then
+  echo "Current path exists but is not a symlink: $CURRENT" >> "$LOG"
+  exit 1
+fi
+mv "$CURRENT_NEW" "$CURRENT"
+
+NEW_EXE="$CURRENT/$EXE_NAME"
+if [ ! -x "$NEW_EXE" ]; then
+  NEW_EXE="$(find "$CURRENT" -mindepth 1 -maxdepth 1 -type f -perm -111 | head -n 1)"
+fi
+if [ -z "$NEW_EXE" ]; then
+  echo "No executable found in current release." >> "$LOG"
+  exit 1
 fi
 
-chmod +x "$EXE" 2>/dev/null || true
-"$EXE" >/dev/null 2>&1 &
+chmod +x "$NEW_EXE" 2>/dev/null || true
+cd "$DEST"
+"$NEW_EXE" >/dev/null 2>&1 &
 `;
 }
 
@@ -203,9 +248,11 @@ export class UpdateService {
       throw new Error("No zip release asset available for self update.");
     }
 
-    await mkdir(paths.updates, { recursive: true });
+    const releasesDir = join(paths.updates, "releases");
+    await mkdir(releasesDir, { recursive: true });
     const zipPath = join(paths.updates, safeFilename(asset.name));
-    const extractDir = join(paths.updates, `extract-${update.latestVersion}-${Date.now()}`);
+    const extractDir = join(releasesDir, `${update.latestVersion}-${Date.now()}`);
+    const currentLink = join(paths.updates, "current");
     const logPath = join(paths.updates, "update.log");
 
     const response = await fetch(asset.url, {
@@ -219,12 +266,28 @@ export class UpdateService {
 
     await Bun.write(zipPath, await response.arrayBuffer());
 
-    const executablePath = process.execPath;
+    const executableName = basename(process.execPath);
     const scriptPath = join(paths.updates, process.platform === "win32" ? "apply-update.cmd" : "apply-update.sh");
     const script =
       process.platform === "win32"
-        ? windowsUpdaterScript({ zipPath, appRoot: paths.root, executablePath, processId: process.pid, extractDir, logPath })
-        : unixUpdaterScript({ zipPath, appRoot: paths.root, executablePath, processId: process.pid, extractDir, logPath });
+        ? windowsUpdaterScript({
+            zipPath,
+            appRoot: paths.root,
+            executableName,
+            processId: process.pid,
+            extractDir,
+            currentLink,
+            logPath,
+          })
+        : unixUpdaterScript({
+            zipPath,
+            appRoot: paths.root,
+            executableName,
+            processId: process.pid,
+            extractDir,
+            currentLink,
+            logPath,
+          });
     await writeFile(scriptPath, script, "utf8");
     if (process.platform !== "win32") await chmod(scriptPath, 0o755);
 
@@ -239,9 +302,10 @@ export class UpdateService {
     return {
       ...update,
       applying: true,
-      message: `Downloaded ${basename(zipPath)}. App will close and apply the update.`,
+      message: `Downloaded ${basename(zipPath)}. App will close, switch data/updates/current to the new release, and restart.`,
       asset,
       logPath,
+      currentLink,
     };
   }
 }
