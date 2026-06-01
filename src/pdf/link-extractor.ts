@@ -1,6 +1,8 @@
 import type { ExtractedLinkKind } from "../shared/types";
 
-const URL_REGEX = /\bhttps?:\/\/[^\s<>"'\)\]\}]+/gi;
+const URL_REGEX = /\b(?:https?:\/\/|www\.|youtube\.com\/|youtu\.be\/)[^\s<>"'\)\]\}]+/gi;
+const DOI_REGEX = /\b10\.\d{4,9}\/[\w\-.;()/:]+/gi;
+const ARXIV_REGEX = /\barXiv:\s*([0-9]{4}\.[0-9]{4,5}(?:v\d+)?|[a-z-]+(?:\.[A-Z]{2})?\/[0-9]{7}(?:v\d+)?)/gi;
 const TRAILING_PUNCT = /[\.,;:!\?\)\]\}>]+$/;
 
 export interface ExtractedLinkCandidate {
@@ -11,6 +13,9 @@ export interface ExtractedLinkCandidate {
 
 function normalizeUrl(rawUrl: string): string | null {
   let url = rawUrl.trim();
+  if (/^(www\.|youtube\.com\/|youtu\.be\/)/i.test(url)) {
+    url = `https://${url}`;
+  }
   // Strip common trailing punctuation that gets glued to URLs in PDFs.
   while (TRAILING_PUNCT.test(url)) {
     url = url.replace(TRAILING_PUNCT, "");
@@ -62,6 +67,17 @@ export function extractLinksFromText(text: string): ExtractedLinkCandidate[] {
     const normalized = normalizeUrl(match);
     if (!normalized) continue;
     results.push({ url: normalized, kind: classify(normalized) });
+  }
+  for (const match of text.match(DOI_REGEX) ?? []) {
+    const doi = match.replace(TRAILING_PUNCT, "");
+    const normalized = normalizeUrl(`https://doi.org/${doi}`);
+    if (normalized) results.push({ url: normalized, kind: "doi" });
+  }
+  for (const match of text.matchAll(ARXIV_REGEX)) {
+    const arxivId = match[1]?.trim();
+    if (!arxivId) continue;
+    const normalized = normalizeUrl(`https://arxiv.org/abs/${arxivId}`);
+    if (normalized) results.push({ url: normalized, kind: "arxiv" });
   }
   return results;
 }

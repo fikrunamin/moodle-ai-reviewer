@@ -408,7 +408,7 @@ export function AssessmentDetailPanel({
 
             <Field label="Extracted text">
               <pre className="max-h-48 overflow-auto whitespace-pre-wrap text-[11.5px]">
-                {detail?.submission?.extracted_text || detail?.submission?.submission_text || "Belum ada teks submission."}
+                {detail?.submission?.extracted_text || "Belum ada teks PDF/DOCX yang berhasil diekstrak."}
               </pre>
             </Field>
 

@@ -91,4 +91,10 @@ export class SubmissionRepository {
       .run(id, input.submissionId, input.filename, input.mimeType ?? null, input.filePath, input.previewPdfPath ?? null, input.extractedTextPath ?? null);
     return id;
   }
+
+  updateFileExtraction(fileId: string, extractedTextPath: string | null) {
+    getDb()
+      .query("UPDATE moodle_submission_files SET extracted_text_path = ? WHERE id = ?")
+      .run(extractedTextPath, fileId);
+  }
 }

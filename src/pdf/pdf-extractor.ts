@@ -2,6 +2,21 @@ import { readFile, writeFile } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { paths } from "../runtime/paths";
 
+interface PdfJsModule {
+  getDocument(input: Record<string, unknown>): { promise: Promise<PdfDocument> };
+}
+
+interface PdfDocument {
+  numPages: number;
+  getPage(pageNumber: number): Promise<PdfPage>;
+  destroy(): Promise<void>;
+}
+
+interface PdfPage {
+  getTextContent(): Promise<{ items: Array<{ str?: string }> }>;
+  getAnnotations(input?: { intent?: string }): Promise<Array<{ url?: string; unsafeUrl?: string }>>;
+}
+
 function ensurePdfRuntimePolyfills() {
   const globalScope = globalThis as {
     DOMMatrix?: unknown;
@@ -55,41 +70,47 @@ function ensurePdfRuntimePolyfills() {
 
 export async function extractPdfText(filePath: string) {
   ensurePdfRuntimePolyfills();
-  const { PDFParse } = await import("pdf-parse");
+  const { getDocument } = (await import("pdfjs-dist/legacy/build/pdf.mjs")) as PdfJsModule;
   const buffer = await readFile(filePath);
-  const parser = new PDFParse({
-    data: buffer,
+  const document = await getDocument({
+    data: new Uint8Array(buffer),
     stopAtErrors: false,
     useWorkerFetch: false,
     useWasm: false,
     isEvalSupported: false,
     disableFontFace: true,
-  });
+  }).promise;
 
   let text = "";
+  const links = new Set<string>();
   try {
-    const info = await parser.getInfo();
     const pageTexts: string[] = [];
     const failedPages: number[] = [];
 
-    for (let page = 1; page <= info.total; page += 1) {
+    for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
       try {
-        const result = await parser.getText({
-          partial: [page],
-          pageJoiner: "\n-- page_number of total_number --",
-        });
-        pageTexts.push(result.text.trim());
+        const page = await document.getPage(pageNumber);
+        const result = await page.getTextContent();
+        pageTexts.push(result.items.map((item) => item.str ?? "").join(" ").replace(/\s+/g, " ").trim());
+        const annotations = await page.getAnnotations({ intent: "display" }).catch(() => []);
+        for (const annotation of annotations) {
+          const url = annotation.url ?? annotation.unsafeUrl;
+          if (url) links.add(url);
+        }
       } catch {
-        failedPages.push(page);
+        failedPages.push(pageNumber);
       }
     }
 
     text = pageTexts.filter(Boolean).join("\n\n");
+    if (links.size) {
+      text += `${text ? "\n\n" : ""}[PDF extracted links]\n${Array.from(links).join("\n")}`;
+    }
     if (failedPages.length) {
       text += `\n\n[PDF extraction warning: failed to extract page(s) ${failedPages.join(", ")}.]`;
     }
   } finally {
-    await parser.destroy().catch(() => null);
+    await document.destroy().catch(() => null);
   }
 
   const outputPath = join(paths.extracted, `${basename(filePath)}.txt`);

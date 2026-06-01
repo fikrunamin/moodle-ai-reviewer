@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import { ExtractedLinkRepository } from "../database/repositories/extracted-link.repository";
 import { ReferenceRepository } from "../database/repositories/reference.repository";
 import { SubmissionRepository } from "../database/repositories/submission.repository";
+import { extractDocumentText } from "../pdf/document-extractor";
 import { extractLinksFromSources } from "../pdf/link-extractor";
 import { parseReferencesFromText } from "../pdf/reference-extractor";
 import {
@@ -40,13 +41,38 @@ export async function extractPdfEnrichmentsJob(input: {
   if (submission.submission_text) {
     sources.push({ text: submission.submission_text });
   }
-  if (submission.extracted_text) {
-    sources.push({ text: submission.extracted_text });
-  }
+
+  const fileTextParts: string[] = [];
   for (const file of files) {
-    if (!file.extracted_text_path) continue;
-    const content = await readFileTextSafe(file.extracted_text_path);
+    let extractedTextPath = file.extracted_text_path;
+    if (!extractedTextPath && existsSync(file.file_path)) {
+      try {
+        const extracted = await extractDocumentText(file.file_path);
+        extractedTextPath = extracted.outputPath;
+        submissions.updateFileExtraction(file.id, extracted.outputPath);
+      } catch (error) {
+        logger.warn(`Refresh extraction failed: ${file.filename} (${file.file_path})`, error);
+      }
+    }
+    if (!extractedTextPath) continue;
+    const content = await readFileTextSafe(extractedTextPath);
     if (content.trim()) sources.push({ text: content, fileId: file.id });
+    if (content.trim()) fileTextParts.push(content);
+  }
+
+  if (fileTextParts.length) {
+    const extractedText = fileTextParts.join("\n\n");
+    if (extractedText !== submission.extracted_text) {
+      submissions.upsert({
+        activityId: submission.activity_id,
+        studentId: submission.student_id,
+        submissionText: submission.submission_text,
+        extractedText,
+        submittedAt: submission.submitted_at,
+      });
+    }
+  } else if (submission.extracted_text) {
+    sources.push({ text: submission.extracted_text });
   }
 
   // Step 1: link extraction

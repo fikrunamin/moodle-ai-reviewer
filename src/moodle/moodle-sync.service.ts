@@ -4,7 +4,7 @@ import { AssessmentRepository } from "../database/repositories/assessment.reposi
 import { ForumRepository } from "../database/repositories/forum.repository";
 import { StudentRepository } from "../database/repositories/student.repository";
 import { SubmissionRepository } from "../database/repositories/submission.repository";
-import { extractDocumentText } from "../pdf/document-extractor";
+import { extractDocumentText, type DocumentKind } from "../pdf/document-extractor";
 import { convertDocxToPdf } from "../pdf/docx-to-pdf";
 import { logger } from "../shared/logger";
 import { MoodleAssignmentScraper, type ScrapedAdvancedRubric } from "./moodle-assignment.scraper";
@@ -233,18 +233,20 @@ export class MoodleSyncService {
             // Record the file immediately so it shows in the UI even if text
             // extraction fails afterwards.
             let extractedTextPath: string | null = null;
+            let documentKind: DocumentKind = "unknown";
             try {
               const extracted = await extractDocumentText(filePath);
+              documentKind = extracted.kind;
+              extractedTextPath = extracted.outputPath;
               if (extracted.text.trim()) {
                 extractedText += `\n\n${extracted.text}`;
-                extractedTextPath = extracted.outputPath;
               }
             } catch (error) {
-              logger.warn("Submission file extraction failed", error);
+              logger.warn(`Submission file extraction failed: ${pdf.filename} (${filePath})`, error);
             }
 
             const lowerName = pdf.filename.toLowerCase();
-            const isDocx = lowerName.endsWith(".docx");
+            const isDocx = documentKind === "docx" || lowerName.endsWith(".docx");
             const mimeType = isDocx
               ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               : lowerName.endsWith(".doc")

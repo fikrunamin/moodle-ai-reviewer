@@ -246,6 +246,58 @@ export class MoodleAssignmentScraper {
   async scrapeGrading(page: Page): Promise<ScrapedAssignmentStudent[]> {
     return page.evaluate((selectors) => {
       const text = (element: Element | null) => element?.textContent?.replace(/\s+/g, " ").trim() ?? "";
+      const cellHeaderText = (cell: Element, index: number) => {
+        const explicit = [
+          cell.getAttribute("data-title"),
+          cell.getAttribute("aria-label"),
+          cell.getAttribute("title"),
+        ]
+          .filter(Boolean)
+          .join(" ");
+        const headers = (cell.getAttribute("headers") ?? "")
+          .split(/\s+/)
+          .map((id) => text(document.getElementById(id)))
+          .filter(Boolean)
+          .join(" ");
+        const table = cell.closest("table");
+        const indexed = table
+          ? text(Array.from(table.querySelectorAll("thead th, thead td"))[index] ?? null)
+          : "";
+        return [explicit, headers, indexed].filter(Boolean).join(" ");
+      };
+      const scrapeSubmissionText = (row: Element) => {
+        const cells = Array.from(row.querySelectorAll("td, th"));
+        const textCells = cells.filter((cell, index) => {
+          const label = cellHeaderText(cell, index).toLowerCase();
+          return /online\s*text|text\s*submission|submission\s*text|teks\s*(online|daring)|jawaban\s*teks/i.test(label);
+        });
+        return textCells
+          .map((cell) => text(cell))
+          .filter(Boolean)
+          .join("\n\n") || null;
+      };
+      const linkLabel = (anchor: HTMLAnchorElement) =>
+        text(anchor) ||
+        anchor.getAttribute("title") ||
+        anchor.getAttribute("aria-label") ||
+        anchor.getAttribute("download") ||
+        text(anchor.querySelector("img[alt]"));
+      const filenameFromUrl = (href: string) => {
+        try {
+          const url = new URL(href);
+          const last = url.pathname.split("/").filter(Boolean).pop();
+          return last ? decodeURIComponent(last) : "submission";
+        } catch {
+          return href.split("/").pop()?.split("?")[0] || "submission";
+        }
+      };
+      const safeDecode = (value: string) => {
+        try {
+          return decodeURIComponent(value);
+        } catch {
+          return value;
+        }
+      };
       const rows = Array.from(document.querySelectorAll("table tbody tr, tr")).filter((row) => row.textContent?.trim());
 
       return rows
@@ -268,15 +320,17 @@ export class MoodleAssignmentScraper {
             .map((link) => {
               const anchor = link as HTMLAnchorElement;
               const href = anchor.href;
-              const label = text(anchor);
+              const label = linkLabel(anchor);
               const lowerHref = href.toLowerCase();
               const lowerLabel = label.toLowerCase();
+              const isPluginSubmissionFile = /pluginfile\.php/i.test(href) && /assignsubmission_file|mod_assign/i.test(href);
               const isDoc =
                 /\.(pdf|docx|doc)(\?|$)/i.test(lowerHref) ||
                 /\.(pdf|docx|doc)$/i.test(lowerLabel) ||
-                (/pluginfile\.php/i.test(href) && /\.(pdf|docx|doc)/i.test(href));
+                (/pluginfile\.php/i.test(href) && /\.(pdf|docx|doc)/i.test(href)) ||
+                isPluginSubmissionFile;
               if (!isDoc) return null;
-              const filename = decodeURIComponent(label || href.split("/").pop()?.split("?")[0] || "submission");
+              const filename = safeDecode(label || filenameFromUrl(href));
               return { url: href, filename };
             })
             .filter(Boolean) as Array<{ url: string; filename: string }>;
@@ -286,7 +340,7 @@ export class MoodleAssignmentScraper {
             studentName,
             email: email && /@/.test(email) ? email : null,
             submissionStatus: rowText.includes("Submitted") || rowText.includes("Terkirim") ? "submitted" : "unknown",
-            submissionText: rowText,
+            submissionText: scrapeSubmissionText(row),
             submittedAt: null,
             pdfUrls,
           };
