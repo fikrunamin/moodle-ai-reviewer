@@ -42,7 +42,7 @@ function repoName() {
 
 function openUrl(url: string) {
   if (process.platform === "win32") {
-    spawn("cmd", ["/c", "start", "", url], { detached: true, stdio: "ignore" });
+    spawn("cmd", ["/c", "start", "", url], { detached: true, stdio: "ignore", windowsHide: true });
     return;
   }
 
@@ -78,12 +78,7 @@ set "CURRENT=${input.currentLink}"
 set "LOG=${input.logPath}"
 
 echo [%date% %time%] Waiting for Moodle AI Review Assistant to close... > "%LOG%"
-:wait
-tasklist /FI "PID eq %APP_PID%" | findstr "%APP_PID%" >nul
-if not errorlevel 1 (
-  timeout /t 1 /nobreak >nul
-  goto wait
-)
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$pidToWait = [int]$env:APP_PID; if (Get-Process -Id $pidToWait -ErrorAction SilentlyContinue) { try { Wait-Process -Id $pidToWait -Timeout 20 -ErrorAction Stop } catch { if (Get-Process -Id $pidToWait -ErrorAction SilentlyContinue) { Stop-Process -Id $pidToWait -Force -ErrorAction SilentlyContinue; Start-Sleep -Seconds 1 } } }" >> "%LOG%" 2>&1
 
 echo [%date% %time%] Extracting update... >> "%LOG%"
 mkdir "%TMP%" >> "%LOG%" 2>&1
@@ -293,7 +288,7 @@ export class UpdateService {
 
     const child =
       process.platform === "win32"
-        ? spawn("cmd", ["/c", scriptPath], { detached: true, stdio: "ignore" })
+        ? spawn("cmd", ["/c", scriptPath], { detached: true, stdio: "ignore", windowsHide: true })
         : spawn(scriptPath, [], { detached: true, stdio: "ignore" });
     child.unref();
 
