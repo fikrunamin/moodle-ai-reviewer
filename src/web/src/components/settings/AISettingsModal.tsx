@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiGet, apiPost } from "../../api/client";
+import { ModalPortal } from "../layout/ModalPortal";
 
 interface Props {
   onClose: () => void;
@@ -149,7 +150,8 @@ export function AISettingsModal({ onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
+    <ModalPortal>
+    <div className="fixed inset-0 z-[1000] grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="win-modal w-full max-w-3xl">
         <div className="win-titlebar">
           <h2 className="text-[13px] font-semibold">Settings</h2>
@@ -363,5 +365,6 @@ export function AISettingsModal({ onClose }: Props) {
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

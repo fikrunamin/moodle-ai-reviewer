@@ -1,3 +1,5 @@
+import { ModalPortal } from "./ModalPortal";
+
 interface Props {
   open: boolean;
   title: string;
@@ -23,7 +25,8 @@ export function ConfirmDialog({
 }: Props) {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
+    <ModalPortal>
+    <div className="fixed inset-0 z-[1100] grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="win-modal w-full max-w-sm">
         <div className="win-titlebar">
           <h2 className="text-[13px] font-semibold">{title}</h2>
@@ -49,5 +52,6 @@ export function ConfirmDialog({
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { apiPostForm } from "../../api/client";
+import { ModalPortal } from "../layout/ModalPortal";
 
 interface Activity {
   id: string;
@@ -56,7 +57,8 @@ export function EditRubricModal({ activity, onClose, onUpdated }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
+    <ModalPortal>
+    <div className="fixed inset-0 z-[1000] grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="win-modal w-full max-w-3xl">
         <div className="win-titlebar">
           <h2 className="text-[13px] font-semibold">Edit Rubrik</h2>
@@ -104,5 +106,6 @@ export function EditRubricModal({ activity, onClose, onUpdated }: Props) {
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }

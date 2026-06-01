@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { apiPostForm } from "../../api/client";
+import { ModalPortal } from "../layout/ModalPortal";
 
 interface Props {
   onClose: () => void;
@@ -48,7 +49,8 @@ export function AddActivityModal({ onClose, onCreated, onCreatedActivity }: Prop
   }
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
+    <ModalPortal>
+    <div className="fixed inset-0 z-[1000] grid place-items-center bg-black/60 p-4 backdrop-blur-sm">
       <div className="win-modal w-full max-w-lg">
         <div className="win-titlebar">
           <h2 className="text-[13px] font-semibold">Add Activity</h2>
@@ -107,5 +109,6 @@ export function AddActivityModal({ onClose, onCreated, onCreatedActivity }: Prop
         </div>
       </div>
     </div>
+    </ModalPortal>
   );
 }
